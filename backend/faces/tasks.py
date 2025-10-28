@@ -2,12 +2,13 @@
 Celery tasks for face processing.
 """
 import logging
+import json
 from celery import shared_task
 from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta
 from .models import FaceIdentity, FaceEmbedding, FaceDetection, Camera
-from .services import InsightFaceService
+from .ai import get_face_service
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ def enroll_face_identity(identity_id, image_paths=None):
     """
     try:
         identity = FaceIdentity.objects.get(id=identity_id)
-        service = InsightFaceService()
+        service = get_face_service()
         
         if not image_paths and not identity.photo:
             logger.error(f"No images provided for identity {identity_id}")
@@ -39,37 +40,26 @@ def enroll_face_identity(identity_id, image_paths=None):
         
         for img_path in image_paths:
             try:
-                # Detect faces
-                faces = service.detect_faces(img_path)
+                # Detect faces and extract embedding
+                embedding = service.extract_embedding(img_path)
                 
-                if not faces:
+                if embedding is None:
                     logger.warning(f"No faces detected in {img_path}")
                     continue
                 
-                # Use the first (largest) face
-                face = faces[0]
-                
-                # Extract embedding
-                embedding = service.extract_embedding(face)
-                if embedding is None:
+                # Detect to get all face info
+                faces = service.detect_faces(img_path)
+                if not faces:
                     continue
+                    
+                face_data = faces[0]  # Use first face
                 
-                # Get attributes
-                attributes = service.get_face_attributes(face)
-                bbox = service.get_face_bbox(face)
-                
-                # Save cropped face
-                from PIL import Image
-                img = Image.open(img_path)
-                face_crop = service.save_face_crop(img, bbox, f'{identity.person_label}_{embeddings_created}.jpg')
-                
-                # Create embedding record
+                # Create embedding record (temporarily store as JSON string)
                 FaceEmbedding.objects.create(
                     identity=identity,
-                    vector=embedding.tolist(),
-                    model_name=service.app.models.get('recognition', 'buffalo_l'),
-                    source_image=face_crop,
-                    quality_score=attributes.get('confidence', 0.0)
+                    vector=json.dumps(embedding),  # Store as JSON temporarily
+                    model_name=service.model_name,
+                    quality_score=face_data.get('confidence', 0.0)
                 )
                 
                 embeddings_created += 1
@@ -109,7 +99,7 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
         List of detection data
     """
     try:
-        service = InsightFaceService()
+        service = get_face_service()
         
         # Detect faces
         faces = service.detect_faces(image_path)
@@ -128,17 +118,16 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
                 pass
         
         for face in faces:
-            # Extract data
-            embedding = service.extract_embedding(face)
-            bbox = service.get_face_bbox(face)
-            attributes = service.get_face_attributes(face)
+            # Extract data from detection result
+            embedding = face.get('embedding')
+            bbox = face.get('bbox')
             
             detection_data = {
                 'bbox': bbox,
-                'confidence': attributes.get('confidence', 0.0),
-                'age': attributes.get('age'),
-                'gender': attributes.get('gender'),
-                'landmarks': attributes.get('landmarks', {}),
+                'confidence': face.get('confidence', 0.0),
+                'age': face.get('age'),
+                'gender': face.get('gender'),
+                'landmarks': face.get('landmarks', []),
             }
             
             # Try to match with known identity
@@ -158,22 +147,17 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
             
             # Create detection record
             if create_detection and camera:
-                from PIL import Image
-                img = Image.open(image_path)
-                face_crop = service.save_face_crop(img, bbox, f'detection_{timezone.now().timestamp()}.jpg')
-                
                 FaceDetection.objects.create(
                     camera=camera,
-                    frame_image=face_crop,
                     bbox=bbox,
                     confidence=detection_data['confidence'],
-                    embedding_vector=embedding.tolist() if embedding is not None else None,
+                    embedding_vector=json.dumps(embedding) if embedding else None,
                     identity_id=detection_data.get('identity_id'),
                     similarity=detection_data.get('similarity'),
                     is_match=detection_data.get('is_match', False),
                     age=detection_data.get('age'),
                     gender=detection_data.get('gender'),
-                    landmarks=detection_data.get('landmarks', {})
+                    landmarks=detection_data.get('landmarks', [])
                 )
         
         logger.info(f"Processed {len(detections)} faces from image")

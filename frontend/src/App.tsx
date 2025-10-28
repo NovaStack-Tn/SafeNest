@@ -13,6 +13,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Alerts } from './pages/Alerts';
 import { Incidents } from './pages/Incidents';
+import { Faces } from './pages/Faces';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -82,7 +83,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="alerts" element={<Alerts />} />
             <Route path="incidents" element={<Incidents />} />
-            <Route path="faces" element={<ComingSoon title="Face Recognition" />} />
+            <Route path="faces" element={<Faces />} />
             <Route path="login-events" element={<ComingSoon title="Login Events" />} />
             <Route path="chat" element={<ComingSoon title="AI Chat" />} />
             <Route path="activity" element={<ComingSoon title="Activity" />} />
