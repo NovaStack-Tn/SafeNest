@@ -152,7 +152,13 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
             
             # Create detection record
             if create_detection and camera:
-                FaceDetection.objects.create(
+                # Crop face from original image
+                from PIL import Image
+                from django.core.files.base import ContentFile
+                import io
+                from datetime import datetime
+                
+                detection_obj = FaceDetection(
                     camera=camera,
                     bbox=bbox,
                     confidence=detection_data['confidence'],
@@ -164,6 +170,38 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
                     gender=detection_data.get('gender'),
                     landmarks=detection_data.get('landmarks', [])
                 )
+                
+                # Save cropped face image
+                try:
+                    img = Image.open(image_path)
+                    x, y, w, h = bbox
+                    # Add padding
+                    padding = 20
+                    x1 = max(0, int(x - padding))
+                    y1 = max(0, int(y - padding))
+                    x2 = min(img.width, int(x + w + padding))
+                    y2 = min(img.height, int(y + h + padding))
+                    
+                    face_img = img.crop((x1, y1, x2, y2))
+                    
+                    # Save to BytesIO
+                    buffer = io.BytesIO()
+                    face_img.save(buffer, format='JPEG', quality=95)
+                    buffer.seek(0)
+                    
+                    # Generate filename
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                    filename = f'face_{timestamp}.jpg'
+                    
+                    detection_obj.frame_image.save(
+                        filename,
+                        ContentFile(buffer.read()),
+                        save=False
+                    )
+                except Exception as e:
+                    logger.error(f"Error saving face image: {e}")
+                
+                detection_obj.save()
         
         logger.info(f"Processed {len(detections)} faces from image")
         return detections

@@ -16,6 +16,7 @@ import { Incidents } from './pages/Incidents';
 import { Faces } from './pages/Faces';
 import { AccessPoints } from './pages/AccessPoints';
 import { Cameras } from './pages/Cameras';
+import { CameraHistory } from './pages/CameraHistory';
 import { Visitors } from './pages/Visitors';
 import { Assets } from './pages/Assets';
 import { ThreatIntel } from './pages/ThreatIntel';
@@ -95,6 +96,7 @@ function App() {
             
             {/* Surveillance */}
             <Route path="cameras" element={<Cameras />} />
+            <Route path="camera-history" element={<CameraHistory />} />
             <Route path="faces" element={<Faces />} />
             
             {/* Incident Management */}

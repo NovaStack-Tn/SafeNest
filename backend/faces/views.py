@@ -221,17 +221,36 @@ class FaceDetectionViewSet(viewsets.ReadOnlyModelViewSet):
     def statistics(self, request):
         """Get detection statistics."""
         queryset = self.get_queryset()
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        today = timezone.now().date()
         
         stats = {
             'total': queryset.count(),
             'matched': queryset.filter(is_match=True).count(),
             'unmatched': queryset.filter(is_match=False).count(),
-            'today': queryset.filter(
-                timestamp__date=request.user.organization.created_at.date() if request.user.organization else None
-            ).count() if request.user.organization else 0,
+            'today': queryset.filter(timestamp__date=today).count(),
+            'last_24h': queryset.filter(timestamp__gte=timezone.now() - timedelta(hours=24)).count(),
         }
         
         return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """Get recent detections for live monitoring."""
+        limit = int(request.query_params.get('limit', 50))
+        queryset = self.get_queryset()[:limit]
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def alerts(self, request):
+        """Get unmatched face alerts (suspected/unknown faces)."""
+        limit = int(request.query_params.get('limit', 20))
+        queryset = self.get_queryset().filter(is_match=False)[:limit]
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FaceAPIView(viewsets.ViewSet):
