@@ -36,6 +36,10 @@ class CameraViewSet(viewsets.ModelViewSet):
         
         return queryset
     
+    def perform_create(self, serializer):
+        """Auto-assign organization from logged-in user."""
+        serializer.save(organization=self.request.user.organization)
+    
     @action(detail=True, methods=['post'])
     def start_stream(self, request, pk=None):
         """Start processing RTSP stream."""
@@ -92,8 +96,11 @@ class FaceIdentityViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        """Set created_by to current user."""
-        serializer.save(created_by=self.request.user)
+        """Set created_by and organization to current user's."""
+        serializer.save(
+            created_by=self.request.user,
+            organization=self.request.user.organization
+        )
     
     @action(detail=True, methods=['post'])
     def enroll(self, request, pk=None):

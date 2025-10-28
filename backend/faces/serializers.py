@@ -16,7 +16,7 @@ class CameraSerializer(serializers.ModelSerializer):
             'confidence_threshold', 'last_detection_at',
             'detection_count', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['last_detection_at', 'created_at', 'updated_at']
+        read_only_fields = ['organization', 'last_detection_at', 'created_at', 'updated_at']
 
 
 class FaceEmbeddingSerializer(serializers.ModelSerializer):
@@ -42,7 +42,7 @@ class FaceIdentitySerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'embedding_count',
             'detection_count', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['enrollment_status', 'created_at', 'updated_at']
+        read_only_fields = ['organization', 'created_by', 'enrollment_status', 'created_at', 'updated_at']
 
 
 class FaceIdentityDetailSerializer(FaceIdentitySerializer):

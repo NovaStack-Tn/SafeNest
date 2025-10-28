@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -10,6 +10,8 @@ import {
   Clock,
   Eye,
   ArrowRight,
+  Upload,
+  X,
 } from 'lucide-react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -380,10 +382,121 @@ const EnrollFaceModal = ({
 
 // Detect Face Modal
 const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
+  const [mode, setMode] = useState<'upload' | 'camera'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [detections, setDetections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Cleanup camera on unmount or when closing modal
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        console.log('Cleaning up camera stream');
+        stream.getTracks().forEach(track => {
+          track.stop();
+          console.log('Stopped track:', track.kind);
+        });
+      }
+    };
+  }, [stream]);
+
+  // Stop camera when modal closes
+  const handleClose = () => {
+    stopCamera();
+    onClose();
+  };
+
+  const startCamera = async () => {
+    try {
+      console.log('Requesting camera access...');
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false,
+      });
+      
+      console.log('Camera access granted, stream:', mediaStream);
+      setStream(mediaStream);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded');
+          videoRef.current?.play()
+            .then(() => {
+              console.log('Video playing');
+              setIsCameraActive(true);
+            })
+            .catch(err => {
+              console.error('Video play error:', err);
+              toast.error('Failed to start video playback');
+            });
+        };
+      }
+    } catch (error: any) {
+      console.error('Camera error:', error);
+      const errorMsg = error.name === 'NotAllowedError' 
+        ? 'Camera access denied. Please allow camera permissions in your browser.'
+        : error.name === 'NotFoundError'
+        ? 'No camera found on your device.'
+        : 'Unable to access camera. Please check your camera settings.';
+      toast.error(errorMsg);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Mirror the image
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      
+      const file = new File([blob], `detection-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
+      setDetections([]);
+      stopCamera();
+    }, 'image/jpeg', 0.92);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -436,12 +549,43 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
         </h2>
 
         <div className="space-y-6">
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Upload Image
-            </label>
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:border-primary-500 transition-colors">
+          {/* Mode Selector */}
+          <div className="flex space-x-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+            <button
+              onClick={() => {
+                setMode('upload');
+                stopCamera();
+              }}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+                mode === 'upload'
+                  ? 'bg-white dark:bg-gray-800 text-primary-600 shadow'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <Upload className="w-4 h-4 inline mr-2" />
+              Upload Photo
+            </button>
+            <button
+              onClick={() => {
+                setMode('camera');
+                setSelectedFile(null);
+                setPreview(null);
+                setDetections([]);
+              }}
+              className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+                mode === 'camera'
+                  ? 'bg-white dark:bg-gray-800 text-primary-600 shadow'
+                  : 'text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <Camera className="w-4 h-4 inline mr-2" />
+              Take Photo
+            </button>
+          </div>
+
+          {/* Upload Mode */}
+          {mode === 'upload' && !preview && (
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-primary-500 transition-colors">
               <input
                 type="file"
                 accept="image/*"
@@ -453,23 +597,97 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
                 htmlFor="detect-file-input"
                 className="cursor-pointer flex flex-col items-center"
               >
-                <Camera className="w-12 h-12 text-gray-400 mb-3" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <Upload className="w-16 h-16 text-gray-400 mb-4" />
+                <span className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Click to upload image
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
                   PNG, JPG up to 10MB
                 </span>
               </label>
             </div>
-          </div>
+          )}
+
+          {/* Camera Mode */}
+          {mode === 'camera' && !preview && (
+            <div className="space-y-4">
+              {!stream ? (
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center">
+                  <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Click below to start your camera
+                  </p>
+                  <Button onClick={startCamera} className="mx-auto">
+                    <Camera className="w-4 h-4 mr-2" />
+                    Start Camera
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
+                    {!isCameraActive && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+                        <div className="text-white text-center">
+                          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                          <p>Starting camera...</p>
+                        </div>
+                      </div>
+                    )}
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                      style={{ transform: 'scaleX(-1)' }}
+                    />
+                    {isCameraActive && (
+                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div className="w-48 h-64 border-4 border-white/60 rounded-3xl"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-center space-x-3">
+                    <Button
+                      onClick={stopCamera}
+                      variant="secondary"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={capturePhoto}
+                      disabled={!isCameraActive}
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      Capture Photo
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Image Preview */}
           {preview && (
-            <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
-              <img src={preview} alt="Preview" className="w-full h-auto" />
+            <div className="space-y-3">
+              <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                <img src={preview} alt="Preview" className="w-full h-auto" />
+                <button
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setPreview(null);
+                    setDetections([]);
+                  }}
+                  className="absolute top-3 right-3 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
+
+          <canvas ref={canvasRef} className="hidden" />
 
           {/* Detection Results */}
           {detections.length > 0 && (
@@ -544,7 +762,7 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
           {/* Action Buttons */}
           <div className="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
             <Button
-              onClick={onClose}
+              onClick={handleClose}
               variant="secondary"
               className="flex-1"
             >
