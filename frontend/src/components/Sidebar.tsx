@@ -6,23 +6,77 @@ import {
   Camera,
   Users,
   MessageSquare,
-  Activity,
   Settings,
   LogOut,
+  DoorOpen,
+  UserPlus,
+  Package,
+  Target,
+  Eye,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-  { icon: AlertTriangle, label: 'Alerts', path: '/alerts' },
-  { icon: Shield, label: 'Incidents', path: '/incidents' },
-  { icon: Camera, label: 'Face Recognition', path: '/faces' },
-  { icon: Users, label: 'Login Events', path: '/login-events' },
-  { icon: MessageSquare, label: 'AI Chat', path: '/chat' },
-  { icon: Activity, label: 'Activity', path: '/activity' },
-  { icon: Settings, label: 'Settings', path: '/settings' },
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+interface NavItem {
+  icon: any;
+  label: string;
+  path: string;
+}
+
+const navSections: NavSection[] = [
+  {
+    title: 'Overview',
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+      { icon: AlertTriangle, label: 'Alerts', path: '/alerts' },
+    ],
+  },
+  {
+    title: '🚪 Access Control',
+    items: [
+      { icon: DoorOpen, label: 'Access Points', path: '/access-points' },
+      { icon: Users, label: 'Login Events', path: '/login-events' },
+    ],
+  },
+  {
+    title: '📹 Surveillance',
+    items: [
+      { icon: Camera, label: 'Cameras', path: '/cameras' },
+      { icon: Eye, label: 'Face Recognition', path: '/faces' },
+    ],
+  },
+  {
+    title: '🚨 Incident Management',
+    items: [
+      { icon: Shield, label: 'Incidents', path: '/incidents' },
+    ],
+  },
+  {
+    title: '🛡️ Threat Intelligence',
+    items: [
+      { icon: Target, label: 'Threat Intel', path: '/threat-intel' },
+    ],
+  },
+  {
+    title: '👥 Visitors & Assets',
+    items: [
+      { icon: UserPlus, label: 'Visitors', path: '/visitors' },
+      { icon: Package, label: 'Assets', path: '/assets' },
+    ],
+  },
+  {
+    title: 'AI & Tools',
+    items: [
+      { icon: MessageSquare, label: 'AI Chat', path: '/chat' },
+      { icon: Settings, label: 'Settings', path: '/settings' },
+    ],
+  },
 ];
 
 export const Sidebar = () => {
@@ -46,22 +100,31 @@ export const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                isActive
-                  ? 'bg-primary-50 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="font-medium">{item.label}</span>
-          </NavLink>
+      <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
+        {navSections.map((section, idx) => (
+          <div key={idx}>
+            <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+              {section.title}
+            </h3>
+            <div className="space-y-1">
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors duration-200 ${
+                      isActive
+                        ? 'bg-primary-50 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium text-sm">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 

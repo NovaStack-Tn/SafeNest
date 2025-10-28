@@ -86,27 +86,26 @@ def enroll_face_identity(identity_id, image_paths=None):
 
 
 @shared_task
-def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
+def detect_faces_in_image(image_path, camera_id=None, organization_id=None, create_detection=True):
     """
-    Detect faces in an image and optionally match with known identities.
+    Detect faces in an image and optionally create detection records.
     
     Args:
         image_path: Path to image file
-        camera_id: Camera ID (optional)
-        create_detection: Whether to create FaceDetection records
+        camera_id: Optional camera ID for detection record
+        organization_id: Organization ID for face recognition matching
+        create_detection: Whether to create detection records in database
     
     Returns:
-        List of detection data
+        List of detection dictionaries
     """
+    from .ai import get_face_service
+    from .models import Camera, FaceDetection, FaceIdentity
+    import json
+    
     try:
         service = get_face_service()
-        
-        # Detect faces
         faces = service.detect_faces(image_path)
-        
-        if not faces:
-            logger.info(f"No faces detected in image")
-            return []
         
         detections = []
         camera = None
@@ -114,6 +113,8 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
         if camera_id:
             try:
                 camera = Camera.objects.get(id=camera_id)
+                if not organization_id:
+                    organization_id = camera.organization.id
             except Camera.DoesNotExist:
                 pass
         
@@ -130,18 +131,22 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
                 'landmarks': face.get('landmarks', []),
             }
             
-            # Try to match with known identity
-            if embedding is not None and camera and camera.organization:
+            # Try to match with known identity (if we have organization)
+            if embedding is not None and organization_id:
                 identity, similarity = recognize_face(
                     embedding,
-                    camera.organization.id
+                    organization_id
                 )
                 
                 if identity:
                     detection_data['identity_id'] = identity.id
                     detection_data['identity_label'] = identity.person_label
+                    detection_data['person_meta'] = identity.person_meta
+                    detection_data['photo'] = identity.photo.url if identity.photo else None
                     detection_data['similarity'] = similarity
-                    detection_data['is_match'] = similarity >= camera.confidence_threshold
+                    detection_data['is_match'] = similarity >= 0.6  # Default threshold
+                    if camera:
+                        detection_data['is_match'] = similarity >= camera.confidence_threshold
             
             detections.append(detection_data)
             
@@ -171,6 +176,7 @@ def detect_faces_in_image(image_path, camera_id=None, create_detection=True):
 def recognize_face(embedding, organization_id, top_k=3):
     """
     Recognize a face by finding nearest embeddings in database.
+    Uses cosine similarity with JSON-stored embeddings (temporary fallback).
     
     Args:
         embedding: numpy array or list
@@ -181,48 +187,62 @@ def recognize_face(embedding, organization_id, top_k=3):
         (FaceIdentity, similarity) or (None, None)
     """
     from django.conf import settings
-    from django.db import connection
+    from .models import FaceEmbedding, FaceIdentity
+    import numpy as np
+    import json
     
     try:
-        # Convert to list if numpy array
-        if hasattr(embedding, 'tolist'):
-            embedding = embedding.tolist()
+        # Convert to numpy array if needed
+        if not isinstance(embedding, np.ndarray):
+            embedding = np.array(embedding)
         
-        # Query with pgvector cosine similarity
-        # 1 - (vector <=> %s) gives cosine similarity
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    fe.identity_id,
-                    1 - (fe.vector <=> %s::vector) AS similarity
-                FROM faces_faceembedding fe
-                INNER JOIN faces_faceidentity fi ON fe.identity_id = fi.id
-                WHERE fi.organization_id = %s 
-                    AND fi.is_active = true
-                    AND fi.enrollment_status = 'enrolled'
-                ORDER BY fe.vector <=> %s::vector
-                LIMIT %s
-            """, [str(embedding), organization_id, str(embedding), top_k])
-            
-            results = cursor.fetchall()
+        # Normalize embedding
+        embedding_norm = embedding / np.linalg.norm(embedding)
         
-        if not results:
-            return None, None
+        # Get all embeddings for active identities in organization
+        identities = FaceIdentity.objects.filter(
+            organization_id=organization_id,
+            is_active=True,
+            enrollment_status='enrolled'
+        ).prefetch_related('embeddings')
         
-        # Get best match
-        identity_id, similarity = results[0]
+        best_match = None
+        best_similarity = 0.0
         
-        threshold = settings.INSIGHTFACE_SIMILARITY_THRESHOLD
+        for identity in identities:
+            for face_embedding in identity.embeddings.all():
+                try:
+                    # Parse JSON-stored embedding
+                    stored_embedding = json.loads(face_embedding.vector)
+                    stored_array = np.array(stored_embedding)
+                    
+                    # Normalize stored embedding
+                    stored_norm = stored_array / np.linalg.norm(stored_array)
+                    
+                    # Calculate cosine similarity
+                    similarity = float(np.dot(embedding_norm, stored_norm))
+                    
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        best_match = identity
+                        
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Error parsing embedding {face_embedding.id}: {e}")
+                    continue
         
-        if similarity >= threshold:
-            identity = FaceIdentity.objects.get(id=identity_id)
-            logger.info(f"Recognized face as {identity.person_label} with similarity {similarity:.3f}")
-            return identity, float(similarity)
+        threshold = getattr(settings, 'INSIGHTFACE_SIMILARITY_THRESHOLD', 0.6)
         
+        if best_match and best_similarity >= threshold:
+            logger.info(f"Recognized face as {best_match.person_label} with similarity {best_similarity:.3f}")
+            return best_match, best_similarity
+        
+        logger.info(f"No match found (best similarity: {best_similarity:.3f}, threshold: {threshold})")
         return None, None
         
     except Exception as e:
         logger.error(f"Error recognizing face: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None, None
 
 

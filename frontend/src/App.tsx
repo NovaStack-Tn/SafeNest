@@ -14,6 +14,12 @@ import { Dashboard } from './pages/Dashboard';
 import { Alerts } from './pages/Alerts';
 import { Incidents } from './pages/Incidents';
 import { Faces } from './pages/Faces';
+import { AccessPoints } from './pages/AccessPoints';
+import { Cameras } from './pages/Cameras';
+import { Visitors } from './pages/Visitors';
+import { Assets } from './pages/Assets';
+import { ThreatIntel } from './pages/ThreatIntel';
+import { Chat } from './pages/Chat';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -82,11 +88,27 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="alerts" element={<Alerts />} />
-            <Route path="incidents" element={<Incidents />} />
-            <Route path="faces" element={<Faces />} />
+            
+            {/* Access Control */}
+            <Route path="access-points" element={<AccessPoints />} />
             <Route path="login-events" element={<ComingSoon title="Login Events" />} />
-            <Route path="chat" element={<ComingSoon title="AI Chat" />} />
-            <Route path="activity" element={<ComingSoon title="Activity" />} />
+            
+            {/* Surveillance */}
+            <Route path="cameras" element={<Cameras />} />
+            <Route path="faces" element={<Faces />} />
+            
+            {/* Incident Management */}
+            <Route path="incidents" element={<Incidents />} />
+            
+            {/* Threat Intelligence */}
+            <Route path="threat-intel" element={<ThreatIntel />} />
+            
+            {/* Visitors & Assets */}
+            <Route path="visitors" element={<Visitors />} />
+            <Route path="assets" element={<Assets />} />
+            
+            {/* AI & Tools */}
+            <Route path="chat" element={<Chat />} />
             <Route path="settings" element={<ComingSoon title="Settings" />} />
           </Route>
 

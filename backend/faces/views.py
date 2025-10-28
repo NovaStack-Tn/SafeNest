@@ -200,10 +200,11 @@ class FaceDetectionViewSet(viewsets.ReadOnlyModelViewSet):
             temp_path = tmp.name
         
         try:
-            # Run detection
+            # Run detection with organization for face recognition
             detections = detect_faces_in_image(
                 temp_path,
                 camera_id=camera_id,
+                organization_id=request.user.organization.id if request.user.organization else None,
                 create_detection=camera_id is not None
             )
             
