@@ -194,19 +194,15 @@ export const Cameras = () => {
               setLiveBoundingBoxes([]);
             }, 2500);
             
-            // Show notifications for detections
+            // Show notifications only for unknown persons (alerts)
             newDetections.forEach((det: any) => {
-              if (det.identity_label) {
-                toast.success(
-                  `✅ Recognized: ${det.identity_label} (${(det.similarity * 100).toFixed(1)}%)`,
-                  { duration: 5000 }
-                );
-              } else {
+              if (!det.identity_label) {
                 toast.error(
                   `⚠️ Unknown Person Detected!`,
-                  { duration: 5000 }
+                  { duration: 5000, icon: '🚨' }
                 );
               }
+              // No notification for recognized faces (silent recognition)
             });
             
             // Refresh stats
@@ -383,18 +379,18 @@ export const Cameras = () => {
                         height: `${h}px`,
                       }}
                     >
-                      {/* Label above box */}
-                      <div className={`absolute -top-8 left-0 ${bgColor} ${textColor} px-3 py-1 rounded text-sm font-bold shadow-lg whitespace-nowrap`}>
+                      {/* Compact label above box */}
+                      <div className={`absolute -top-6 left-0 ${bgColor} ${textColor} px-2 py-0.5 rounded text-xs font-semibold shadow-md whitespace-nowrap`}>
                         {isMatched ? (
-                          <span>✅ {det.identity_label}</span>
+                          <span>✓ {det.identity_label}</span>
                         ) : (
-                          <span>⚠️ UNKNOWN</span>
+                          <span>⚠ UNKNOWN</span>
                         )}
                       </div>
-                      {/* Confidence below box */}
+                      {/* Compact confidence badge */}
                       {det.similarity && (
-                        <div className={`absolute -bottom-7 left-0 ${bgColor} ${textColor} px-2 py-0.5 rounded text-xs shadow-lg`}>
-                          {(det.similarity * 100).toFixed(1)}%
+                        <div className={`absolute -bottom-5 left-0 ${bgColor} ${textColor} px-1.5 py-0.5 rounded text-xs shadow-md`}>
+                          {(det.similarity * 100).toFixed(0)}%
                         </div>
                       )}
                     </motion.div>
