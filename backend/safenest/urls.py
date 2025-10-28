@@ -6,8 +6,26 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.shortcuts import redirect
+from django.http import JsonResponse
+
+def home_redirect(request):
+    """Redirect root URL to admin or return API info"""
+    if request.path == '/':
+        return JsonResponse({
+            'message': 'SafeNest Security Management Platform',
+            'version': '1.0.0',
+            'endpoints': {
+                'admin': '/admin/',
+                'api': '/api/',
+                'api_docs': '/api/schema/swagger-ui/',
+                'auth': '/api/auth/token/'
+            }
+        })
+    return redirect('/admin/')
 
 urlpatterns = [
+    path('', home_redirect, name='home'),
     path('admin/', admin.site.urls),
     
     # JWT Authentication
@@ -23,6 +41,7 @@ urlpatterns = [
     path('api/visitors/', include('visitor_assets.urls')),
     path('api/llm/', include('llm.urls')),
     path('api/dashboard/', include('dashboard.urls')),
+    path('api/threat-intelligence/', include('threat_intelligence.urls')),
 ]
 
 if settings.DEBUG:
