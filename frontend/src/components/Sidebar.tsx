@@ -13,6 +13,11 @@ import {
   Package,
   Target,
   Eye,
+  Activity,
+  TrendingUp,
+  Search,
+  Crosshair,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -60,7 +65,12 @@ const navSections: NavSection[] = [
   {
     title: '🛡️ Threat Intelligence',
     items: [
-      { icon: Target, label: 'Threat Intel', path: '/threat-intel' },
+      { icon: Target, label: 'Threats', path: '/threats' },
+      { icon: Activity, label: 'Alerts Intel', path: '/alerts-intel' },
+      { icon: TrendingUp, label: 'Risk Assessments', path: '/risk-assessments' },
+      { icon: Crosshair, label: 'Threat Indicators', path: '/threat-indicators' },
+      { icon: Database, label: 'Watchlist', path: '/watchlist' },
+      { icon: Search, label: 'Threat Hunting', path: '/threat-hunting' },
     ],
   },
   {
