@@ -202,6 +202,15 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
                     logger.error(f"Error saving face image: {e}")
                 
                 detection_obj.save()
+                
+                # Send email alert for unknown persons
+                if not detection_data.get('is_match', False) and camera.organization:
+                    try:
+                        from .emails import send_unknown_person_alert
+                        send_unknown_person_alert(detection_obj, camera.organization)
+                        logger.info(f"Email alert sent for unknown person detection {detection_obj.id}")
+                    except Exception as e:
+                        logger.error(f"Failed to send email alert: {e}")
         
         logger.info(f"Processed {len(detections)} faces from image")
         return detections
