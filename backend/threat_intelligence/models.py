@@ -183,7 +183,7 @@ class Alert(models.Model):
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        related_name='alerts'
+        related_name='threat_intel_alerts'
     )
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -204,7 +204,7 @@ class Alert(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='alerts'
+        related_name='threat_intel_alerts'
     )
     access_point = models.ForeignKey(
         AccessPoint,
@@ -224,14 +224,14 @@ class Alert(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='assigned_alerts'
+        related_name='assigned_threat_intel_alerts'
     )
     acknowledged_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='acknowledged_alerts'
+        related_name='acknowledged_threat_intel_alerts'
     )
     acknowledged_at = models.DateTimeField(null=True, blank=True)
     
