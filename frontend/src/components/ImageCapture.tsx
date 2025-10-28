@@ -62,21 +62,38 @@ export const ImageCapture = ({
 
   // Capture photo from camera
   const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('Video or canvas ref not available');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // Check if video is ready
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.error('Video not ready');
+      return;
+    }
     
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('Could not get canvas context');
+      return;
+    }
 
-    ctx.drawImage(video, 0, 0);
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
+    // Convert to blob
     canvas.toBlob((blob) => {
-      if (!blob) return;
+      if (!blob) {
+        console.error('Failed to create blob from canvas');
+        return;
+      }
       
       const file = new File(
         [blob],
@@ -86,10 +103,10 @@ export const ImageCapture = ({
       
       const newImages = [...capturedImages, file];
       setCapturedImages(newImages);
+      onImagesCapture(newImages);
       
       if (mode === 'single' || newImages.length >= maxImages) {
         stopCamera();
-        onImagesCapture(newImages);
       }
     }, 'image/jpeg', 0.95);
   }, [capturedImages, maxImages, mode, onImagesCapture, stopCamera]);
@@ -212,28 +229,68 @@ export const ImageCapture = ({
               autoPlay
               playsInline
               muted
-              className="w-full h-auto"
+              className="w-full h-auto mirror"
+              style={{ transform: 'scaleX(-1)' }}
             />
             
             {/* Camera Overlay Guide */}
             <div className="absolute inset-0 pointer-events-none">
+              {/* Face Guide Frame */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-64 h-80 border-4 border-white/50 rounded-3xl"></div>
+                <div className="w-64 h-80 border-4 border-white/60 rounded-3xl shadow-lg"></div>
               </div>
-              <div className="absolute top-4 left-0 right-0 text-center">
-                <p className="text-white text-sm font-medium bg-black/50 inline-block px-4 py-2 rounded-full">
-                  Position your face in the frame
-                </p>
+              
+              {/* Step-by-Step Instructions */}
+              <div className="absolute top-4 left-0 right-0 px-4">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-4 shadow-2xl max-w-md mx-auto">
+                  <div className="text-center space-y-2">
+                    {capturedImages.length === 0 && (
+                      <>
+                        <div className="text-2xl font-bold text-white">📸 Photo 1 of 3</div>
+                        <div className="text-lg font-semibold text-white">Face Forward</div>
+                        <div className="text-sm text-white/90">
+                          Look straight at the camera
+                        </div>
+                      </>
+                    )}
+                    {capturedImages.length === 1 && (
+                      <>
+                        <div className="text-2xl font-bold text-white">📸 Photo 2 of 3</div>
+                        <div className="text-lg font-semibold text-white">Turn Left</div>
+                        <div className="text-sm text-white/90">
+                          Turn your head 45° to the left
+                        </div>
+                      </>
+                    )}
+                    {capturedImages.length === 2 && (
+                      <>
+                        <div className="text-2xl font-bold text-white">📸 Photo 3 of 3</div>
+                        <div className="text-lg font-semibold text-white">Turn Right</div>
+                        <div className="text-sm text-white/90">
+                          Turn your head 45° to the right
+                        </div>
+                      </>
+                    )}
+                    {capturedImages.length >= 3 && (
+                      <>
+                        <div className="text-2xl font-bold text-white">✅ Great!</div>
+                        <div className="text-sm text-white/90">
+                          You can add more or finish
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Camera Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
-              <div className="flex items-center justify-center space-x-4">
+            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+              <div className="flex items-center justify-between max-w-md mx-auto">
                 <Button
                   onClick={stopCamera}
                   variant="secondary"
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
                 >
                   <X className="w-4 h-4 mr-2" />
                   Cancel
@@ -243,13 +300,15 @@ export const ImageCapture = ({
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={capturePhoto}
-                  className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center"
+                  className="w-20 h-20 rounded-full bg-white shadow-2xl flex items-center justify-center border-4 border-white/50 hover:border-white transition-all"
+                  title="Click to capture"
                 >
-                  <Camera className="w-8 h-8 text-gray-900" />
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600"></div>
                 </motion.button>
 
-                <div className="text-white text-sm min-w-[100px] text-right">
-                  {capturedImages.length}/{maxImages} photos
+                <div className="text-white text-right">
+                  <div className="text-2xl font-bold">{capturedImages.length}</div>
+                  <div className="text-xs text-white/80">of {maxImages}</div>
                 </div>
               </div>
             </div>

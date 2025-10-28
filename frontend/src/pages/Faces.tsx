@@ -9,11 +9,12 @@ import {
   CheckCircle,
   Clock,
   Eye,
+  ArrowRight,
 } from 'lucide-react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Loader } from '@/components/Loader';
-import { ImageCapture } from '@/components/ImageCapture';
+import { CameraWizard } from '@/components/CameraWizard';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -31,7 +32,6 @@ interface FaceIdentity {
 export const Faces = () => {
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showDetectModal, setShowDetectModal] = useState(false);
-  const [selectedIdentity, setSelectedIdentity] = useState<FaceIdentity | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch identities
@@ -164,7 +164,7 @@ export const Faces = () => {
               <FaceIdentityCard
                 key={identity.id}
                 identity={identity}
-                onSelect={setSelectedIdentity}
+                onSelect={() => {}}
               />
             ))}
           </div>
@@ -242,7 +242,7 @@ const FaceIdentityCard = ({
   );
 };
 
-// Enroll Face Modal
+// Enroll Face Modal - Wizard Style
 const EnrollFaceModal = ({
   onClose,
   onSuccess,
@@ -250,18 +250,19 @@ const EnrollFaceModal = ({
   onClose: () => void;
   onSuccess: () => void;
 }) => {
+  const [step, setStep] = useState<'name' | 'camera'>('name');
   const [personLabel, setPersonLabel] = useState('');
-  const [capturedImages, setCapturedImages] = useState<File[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!personLabel || capturedImages.length === 0) {
-      toast.error('Please provide a name and at least one image');
+    if (!personLabel.trim()) {
+      toast.error('Please enter a person name');
       return;
     }
+    setStep('camera');
+  };
 
-    setLoading(true);
+  const handleCameraComplete = async (images: File[]) => {
     try {
       // Create identity
       const identityResponse = await api.post('/faces/identities/', {
@@ -271,7 +272,7 @@ const EnrollFaceModal = ({
 
       // Upload images for enrollment
       const formData = new FormData();
-      capturedImages.forEach((file) => {
+      images.forEach((file) => {
         formData.append('images', file);
       });
 
@@ -279,74 +280,96 @@ const EnrollFaceModal = ({
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      toast.success(`Face enrollment started for ${personLabel}!`);
+      toast.success(`✅ Face enrollment started for ${personLabel}!`);
       onSuccess();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to enroll face');
-    } finally {
-      setLoading(false);
+      setStep('name'); // Go back to name step on error
     }
   };
 
+  const handleCameraCancel = () => {
+    setStep('name');
+  };
+
+  if (step === 'camera') {
+    return (
+      <CameraWizard
+        personName={personLabel}
+        onComplete={handleCameraComplete}
+        onCancel={handleCameraCancel}
+      />
+    );
+  }
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-2xl w-full my-8 shadow-2xl"
+        className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl"
       >
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
-          <UserPlus className="w-6 h-6 mr-2 text-primary-600" />
-          Enroll New Face
-        </h2>
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Enroll New Face
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Let's start by entering the person's name
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name Input */}
+        <form onSubmit={handleNameSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Person Name *
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Person's Full Name
             </label>
             <input
               type="text"
               value={personLabel}
               onChange={(e) => setPersonLabel(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all"
               placeholder="e.g., John Doe"
+              autoFocus
               required
             />
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              This name will be used to identify the person
+            </p>
           </div>
 
-          {/* Image Capture Component */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Capture Photos *
-            </label>
-            <ImageCapture
-              onImagesCapture={setCapturedImages}
-              maxImages={5}
-              mode="multiple"
-              guidanceText="Take 3-5 clear photos from different angles. Ensure good lighting and face the camera directly. Remove sunglasses or masks."
-            />
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center">
+              <Camera className="w-4 h-4 mr-2" />
+              Next Step: Photo Capture
+            </h3>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              After entering the name, you'll be guided through capturing 3 photos:
+            </p>
+            <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4">
+              <li>• Face forward (straight)</li>
+              <li>• Turn left (45 degrees)</li>
+              <li>• Turn right (45 degrees)</li>
+            </ul>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex space-x-3 pt-4">
             <Button
               type="button"
               onClick={onClose}
               variant="secondary"
               className="flex-1"
-              disabled={loading}
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className="flex-1" 
-              loading={loading}
-              disabled={!personLabel || capturedImages.length === 0}
+            <Button
+              type="submit"
+              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              {loading ? 'Enrolling...' : `Enroll ${capturedImages.length} Photo(s)`}
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </form>
@@ -357,20 +380,30 @@ const EnrollFaceModal = ({
 
 // Detect Face Modal
 const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
-  const [capturedImages, setCapturedImages] = useState<File[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [detections, setDetections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
+      setDetections([]);
+    }
+  };
+
   const handleDetect = async () => {
-    if (capturedImages.length === 0) {
-      toast.error('Please capture an image first');
+    if (!selectedFile) {
+      toast.error('Please select an image first');
       return;
     }
 
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append('image', capturedImages[0]);
+      formData.append('image', selectedFile);
 
       const response = await api.post('/faces/detections/detect/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -403,18 +436,40 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
         </h2>
 
         <div className="space-y-6">
-          {/* Image Capture */}
+          {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Capture or Upload Image
+              Upload Image
             </label>
-            <ImageCapture
-              onImagesCapture={setCapturedImages}
-              maxImages={1}
-              mode="single"
-              guidanceText="Upload or take a photo with faces you want to detect. Multiple faces can be detected in one image."
-            />
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:border-primary-500 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+                id="detect-file-input"
+              />
+              <label
+                htmlFor="detect-file-input"
+                className="cursor-pointer flex flex-col items-center"
+              >
+                <Camera className="w-12 h-12 text-gray-400 mb-3" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Click to upload image
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  PNG, JPG up to 10MB
+                </span>
+              </label>
+            </div>
           </div>
+
+          {/* Image Preview */}
+          {preview && (
+            <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+              <img src={preview} alt="Preview" className="w-full h-auto" />
+            </div>
+          )}
 
           {/* Detection Results */}
           {detections.length > 0 && (
@@ -499,7 +554,7 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
               onClick={handleDetect}
               className="flex-1"
               loading={loading}
-              disabled={capturedImages.length === 0 || loading}
+              disabled={!selectedFile || loading}
             >
               <Camera className="w-4 h-4 mr-2" />
               {loading ? 'Detecting...' : 'Detect Faces'}
