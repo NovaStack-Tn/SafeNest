@@ -426,25 +426,42 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
       });
       
       console.log('Camera access granted, stream:', mediaStream);
+      console.log('Stream tracks:', mediaStream.getTracks());
+      
       setStream(mediaStream);
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        
-        // Wait for video to be ready
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded');
-          videoRef.current?.play()
+      // Use setTimeout to ensure video element is rendered
+      setTimeout(() => {
+        if (videoRef.current) {
+          console.log('Setting video srcObject');
+          videoRef.current.srcObject = mediaStream;
+          
+          // Try to play immediately
+          videoRef.current.play()
             .then(() => {
-              console.log('Video playing');
+              console.log('Video playing successfully');
               setIsCameraActive(true);
             })
             .catch(err => {
               console.error('Video play error:', err);
-              toast.error('Failed to start video playback');
+              // Try with loadedmetadata event
+              videoRef.current!.onloadedmetadata = () => {
+                console.log('Video metadata loaded, trying play again');
+                videoRef.current?.play()
+                  .then(() => {
+                    console.log('Video playing after metadata load');
+                    setIsCameraActive(true);
+                  })
+                  .catch(e => {
+                    console.error('Second play attempt failed:', e);
+                    toast.error('Failed to start video playback');
+                  });
+              };
             });
-        };
-      }
+        } else {
+          console.error('Video ref is null');
+        }
+      }, 100);
     } catch (error: any) {
       console.error('Camera error:', error);
       const errorMsg = error.name === 'NotAllowedError' 
@@ -640,6 +657,12 @@ const DetectFaceModal = ({ onClose }: { onClose: () => void }) => {
                       muted
                       className="w-full h-full object-cover"
                       style={{ transform: 'scaleX(-1)' }}
+                      onCanPlay={() => {
+                        console.log('Video can play');
+                        if (!isCameraActive) {
+                          setIsCameraActive(true);
+                        }
+                      }}
                     />
                     {isCameraActive && (
                       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
