@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Target, AlertTriangle, TrendingUp, Shield, Search, Filter } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Target, AlertTriangle, TrendingUp, Shield, Search, Filter, X } from 'lucide-react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Loader } from '@/components/Loader';
+import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 interface Threat {
   id: number;
@@ -36,9 +38,19 @@ const STATUS_COLORS = {
 };
 
 export const Threats = () => {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    threat_type: 'malware',
+    severity: 'medium',
+    source: 'manual',
+  });
 
   const { data: threats, isLoading } = useQuery<Threat[]>({
     queryKey: ['threats'],
@@ -48,6 +60,39 @@ export const Threats = () => {
     },
     refetchInterval: 30000,
   });
+
+  // Create threat mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const payload = {
+        ...data,
+        organization: user?.organization,
+        created_by: user?.id,
+      };
+      const response = await api.post('/threat-intelligence/threats/', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['threats'] });
+      setIsCreateModalOpen(false);
+      setFormData({
+        title: '',
+        description: '',
+        threat_type: 'malware',
+        severity: 'medium',
+        source: 'manual',
+      });
+      toast.success('Threat created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to create threat');
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate(formData);
+  };
 
   const filteredThreats = threats?.filter((threat) => {
     const matchesSearch = threat.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -81,7 +126,7 @@ export const Threats = () => {
             Monitor and manage security threats
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Threat
         </Button>
@@ -221,6 +266,131 @@ export const Threats = () => {
           ))
         )}
       </div>
+
+      {/* Create Threat Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Create New Threat
+                </h2>
+                <button
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Threat Type *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={formData.threat_type}
+                      onChange={(e) => setFormData({ ...formData, threat_type: e.target.value })}
+                    >
+                      <option value="malware">Malware</option>
+                      <option value="phishing">Phishing</option>
+                      <option value="ransomware">Ransomware</option>
+                      <option value="ddos">DDoS</option>
+                      <option value="data_breach">Data Breach</option>
+                      <option value="unauthorized_access">Unauthorized Access</option>
+                      <option value="insider_threat">Insider Threat</option>
+                      <option value="social_engineering">Social Engineering</option>
+                      <option value="zero_day">Zero Day</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Severity *
+                    </label>
+                    <select
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={formData.severity}
+                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Source
+                  </label>
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    value={formData.source}
+                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="automated">Automated</option>
+                    <option value="external_feed">External Feed</option>
+                    <option value="user_report">User Report</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending}
+                    className="flex-1"
+                  >
+                    {createMutation.isPending ? 'Creating...' : 'Create Threat'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
