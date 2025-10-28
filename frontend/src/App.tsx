@@ -20,6 +20,14 @@ import { Visitors } from './pages/Visitors';
 import { Assets } from './pages/Assets';
 import { ThreatIntel } from './pages/ThreatIntel';
 import { Chat } from './pages/Chat';
+import {
+  Threats,
+  AlertsIntel,
+  RiskAssessments,
+  ThreatIndicators,
+  Watchlist,
+  ThreatHunting
+} from './pages/ThreatIntelligence';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -102,6 +110,12 @@ function App() {
             
             {/* Threat Intelligence */}
             <Route path="threat-intel" element={<ThreatIntel />} />
+            <Route path="threats" element={<Threats />} />
+            <Route path="alerts-intel" element={<AlertsIntel />} />
+            <Route path="risk-assessments" element={<RiskAssessments />} />
+            <Route path="threat-indicators" element={<ThreatIndicators />} />
+            <Route path="watchlist" element={<Watchlist />} />
+            <Route path="threat-hunting" element={<ThreatHunting />} />
             
             {/* Visitors & Assets */}
             <Route path="visitors" element={<Visitors />} />
