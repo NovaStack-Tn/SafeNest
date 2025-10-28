@@ -3,7 +3,6 @@ Core models for SafeNest: Organizations, Users, Roles, Permissions, Teams
 """
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
-from django.contrib.postgres.fields import JSONField
 from django.utils.translation import gettext_lazy as _
 
 

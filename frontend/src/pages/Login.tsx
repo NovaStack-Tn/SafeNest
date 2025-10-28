@@ -21,21 +21,39 @@ export const Login = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/token/', {
+      // Step 1: Get JWT tokens
+      const tokenResponse = await api.post('/auth/token/', {
         username,
         password,
       });
 
-      const { access, refresh, user } = response.data;
+      const { access, refresh } = tokenResponse.data;
 
+      // Store tokens immediately
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
+
+      // Step 2: Fetch user data with the token
+      const userResponse = await api.get('/users/me/');
+      const user = userResponse.data;
+
+      // Set user in auth store
       setUser(user);
 
-      toast.success('Welcome back!');
+      toast.success(`Welcome back, ${user.first_name || user.username}!`);
+      
+      // Navigate to dashboard
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Login failed');
+      // Clear tokens on error
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      
+      const errorMessage = error.response?.data?.detail 
+        || error.response?.data?.message 
+        || 'Login failed. Please check your credentials.';
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
