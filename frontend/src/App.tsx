@@ -11,6 +11,8 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 // Pages
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Alerts } from './pages/Alerts';
+import { Incidents } from './pages/Incidents';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -78,8 +80,8 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="alerts" element={<ComingSoon title="Alerts" />} />
-            <Route path="incidents" element={<ComingSoon title="Incidents" />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="incidents" element={<Incidents />} />
             <Route path="faces" element={<ComingSoon title="Face Recognition" />} />
             <Route path="login-events" element={<ComingSoon title="Login Events" />} />
             <Route path="chat" element={<ComingSoon title="AI Chat" />} />
