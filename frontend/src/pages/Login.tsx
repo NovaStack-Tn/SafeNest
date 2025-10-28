@@ -1,13 +1,13 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Loader2 } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Card } from '@/components/Card';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
+import logo from '@/assets/logo.png';
 
 export const Login = () => {
   const [username, setUsername] = useState('');
@@ -70,8 +70,8 @@ export const Login = () => {
         <Card className="p-8">
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 dark:bg-primary-900 mb-4">
-              <Shield className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <img src={logo} alt="SafeNest Logo" className="w-20 h-20 object-contain" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">SafeNest</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
@@ -111,17 +111,7 @@ export const Login = () => {
             </Button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              <strong>Demo Credentials:</strong>
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              Username: <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded">admin</code>
-              <br />
-              Password: <code className="bg-white dark:bg-gray-800 px-2 py-1 rounded">admin123</code>
-            </p>
-          </div>
+         
         </Card>
 
         {/* Footer */}

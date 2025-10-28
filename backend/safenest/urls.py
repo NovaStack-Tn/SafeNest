@@ -16,9 +16,11 @@ urlpatterns = [
     
     # API endpoints
     path('api/', include('core.urls')),
+    path('api/access/', include('access_control.urls')),
     path('api/security/', include('security.urls')),
     path('api/incidents/', include('incidents.urls')),
     path('api/faces/', include('faces.urls')),
+    path('api/visitors/', include('visitor_assets.urls')),
     path('api/llm/', include('llm.urls')),
     path('api/dashboard/', include('dashboard.urls')),
 ]

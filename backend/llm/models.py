@@ -3,7 +3,8 @@ LLM models: ChatSession, Message, PromptTemplate
 """
 from django.db import models
 from django.contrib.auth import get_user_model
-from pgvector.django import VectorField
+# Temporarily disabled - install pgvector extension first
+# from pgvector.django import VectorField
 from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
@@ -114,7 +115,8 @@ class RAGDocument(models.Model):
     document_type = models.CharField(max_length=50)  # 'alert', 'incident', 'login_event'
     document_id = models.CharField(max_length=255)
     content = models.TextField()
-    embedding = VectorField(dimensions=1536)  # OpenAI ada-002 produces 1536-dim
+    # Temporarily using TextField - will change to VectorField after pgvector installation
+    embedding = models.TextField(help_text="Document embedding vector (temp: install pgvector)")
     
     metadata = models.JSONField(default=dict, blank=True)
     indexed_at = models.DateTimeField(auto_now_add=True)

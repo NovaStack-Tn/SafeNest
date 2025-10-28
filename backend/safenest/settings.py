@@ -8,6 +8,10 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-in-production')
 
@@ -37,9 +41,11 @@ INSTALLED_APPS = [
     
     # Local apps
     'core.apps.CoreConfig',
+    'access_control.apps.AccessControlConfig',
     'security.apps.SecurityConfig',
     'incidents.apps.IncidentsConfig',
     'faces.apps.FacesConfig',
+    'visitor_assets.apps.VisitorAssetsConfig',
     'llm.apps.LlmConfig',
     'dashboard.apps.DashboardConfig',
 ]
@@ -168,6 +174,11 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Temporary: Run tasks synchronously (without Redis) for development
+# Remove this when Redis is installed
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
 # MinIO/S3 Configuration
 MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'localhost:9000')

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
+import logo from '@/assets/logo.png';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -38,8 +39,8 @@ export const Sidebar = () => {
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-2">
-          <Shield className="w-8 h-8 text-primary-600" />
+        <div className="flex items-center space-x-3">
+          <img src={logo} alt="SafeNest Logo" className="w-10 h-10 object-contain" />
           <span className="text-xl font-bold text-gray-900 dark:text-white">SafeNest</span>
         </div>
       </div>

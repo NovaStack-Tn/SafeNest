@@ -4,7 +4,8 @@ Face recognition models: Camera, FaceIdentity, FaceEmbedding, FaceDetection
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
-from pgvector.django import VectorField
+# Temporarily disabled - install pgvector extension first
+# from pgvector.django import VectorField
 from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
@@ -100,7 +101,8 @@ class FaceEmbedding(models.Model):
         on_delete=models.CASCADE,
         related_name='embeddings'
     )
-    vector = VectorField(dimensions=512)  # ArcFace produces 512-dim embeddings
+    # Temporarily using TextField - will change to VectorField after pgvector installation
+    vector = models.TextField(help_text="Face embedding vector (temp: install pgvector)")
     model_name = models.CharField(max_length=50, default='buffalo_l')
     
     # Source image info
@@ -132,7 +134,8 @@ class FaceDetection(models.Model):
     # Detection data
     bbox = models.JSONField(help_text="Bounding box coordinates [x, y, w, h]")
     confidence = models.FloatField(help_text="Detection confidence score")
-    embedding_vector = VectorField(dimensions=512, null=True, blank=True)
+    # Temporarily using TextField - will change to VectorField after pgvector installation
+    embedding_vector = models.TextField(null=True, blank=True, help_text="Face embedding vector (temp)")
     
     # Recognition result
     identity = models.ForeignKey(
