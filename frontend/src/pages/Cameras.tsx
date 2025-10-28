@@ -70,14 +70,6 @@ export const Cameras = () => {
           console.log('Video metadata loaded');
           setIsStreaming(true);
           
-          // Update video dimensions
-          if (videoRef.current) {
-            setVideoSize({
-              width: videoRef.current.videoWidth,
-              height: videoRef.current.videoHeight
-            });
-          }
-          
           videoRef.current?.play().then(() => {
             console.log('Video playing successfully');
             toast.success('📹 Camera started - Face detection active');

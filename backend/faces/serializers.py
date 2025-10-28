@@ -57,12 +57,13 @@ class FaceDetectionSerializer(serializers.ModelSerializer):
     camera_name = serializers.CharField(source='camera.name', read_only=True)
     identity_label = serializers.CharField(source='identity.person_label', read_only=True)
     frame_url = serializers.SerializerMethodField()
+    identity_photo = serializers.SerializerMethodField()
     
     class Meta:
         model = FaceDetection
         fields = [
             'id', 'camera', 'camera_name', 'frame_url', 'frame_image',
-            'bbox', 'confidence', 'identity', 'identity_label',
+            'bbox', 'confidence', 'identity', 'identity_label', 'identity_photo',
             'similarity', 'is_match', 'age', 'gender',
             'landmarks', 'timestamp'
         ]
@@ -73,6 +74,12 @@ class FaceDetectionSerializer(serializers.ModelSerializer):
         if obj.frame_image and request:
             return request.build_absolute_uri(obj.frame_image.url)
         return obj.frame_url
+    
+    def get_identity_photo(self, obj):
+        request = self.context.get('request')
+        if obj.identity and obj.identity.photo and request:
+            return request.build_absolute_uri(obj.identity.photo.url)
+        return None
 
 
 class EnrollFaceSerializer(serializers.Serializer):
