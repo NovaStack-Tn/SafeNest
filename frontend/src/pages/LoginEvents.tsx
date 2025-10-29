@@ -2,8 +2,7 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import {
   Activity, TrendingUp, AlertCircle, CheckCircle, Clock, Filter,
-  Calendar, BarChart3, Users, MapPin, Eye, Download, RefreshCw, 
-  DoorOpen, ArrowRight, Zap, Brain
+  Calendar, Download, RefreshCw, DoorOpen, ArrowRight, Zap, Brain
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -69,7 +68,10 @@ export const LoginEvents = () => {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const headers = { Authorization: `Bearer ${token}` };
       
@@ -84,12 +86,18 @@ export const LoginEvents = () => {
         axios.get('http://localhost:8000/api/access-control/stats/analytics/', { headers })
       ]);
 
-      setLogs(logsRes.data);
+      // Handle paginated response (DRF returns {results: [...]} for lists)
+      const logsData = logsRes.data.results || logsRes.data;
+      setLogs(Array.isArray(logsData) ? logsData : []);
       setStats(statsRes.data);
       setBusyHours(analyticsRes.data.busy_hours_prediction || []);
       setSuggestions(analyticsRes.data.optimization_suggestions || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Ensure arrays are always set even on error
+      setLogs([]);
+      setBusyHours([]);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }

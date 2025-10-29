@@ -59,7 +59,10 @@ export const AccessPoints = () => {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       const headers = { Authorization: `Bearer ${token}` };
       
@@ -68,10 +71,14 @@ export const AccessPoints = () => {
         axios.get('http://localhost:8000/api/access-control/stats/summary/', { headers })
       ]);
 
-      setAccessPoints(pointsRes.data);
+      // Handle paginated response (DRF returns {results: [...]} for lists)
+      const pointsData = pointsRes.data.results || pointsRes.data;
+      setAccessPoints(Array.isArray(pointsData) ? pointsData : []);
       setStats(statsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Ensure accessPoints is always an array even on error
+      setAccessPoints([]);
     } finally {
       setLoading(false);
     }

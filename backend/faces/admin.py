@@ -7,7 +7,7 @@ from .models import Camera, FaceIdentity, FaceEmbedding, FaceDetection
 
 @admin.register(Camera)
 class CameraAdmin(admin.ModelAdmin):
-    list_display = ['name', 'organization', 'location', 'active', 'last_detection_at', 'created_at']
+    list_display = ['name', 'organization', 'access_point', 'location', 'active', 'last_detection_at', 'created_at']
     list_filter = ['organization', 'active', 'created_at']
     search_fields = ['name', 'location']
     readonly_fields = ['last_detection_at', 'created_at', 'updated_at']

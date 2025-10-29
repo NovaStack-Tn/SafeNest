@@ -1,30 +1,42 @@
 """
 Script to create test data for Access Control Management
-Run this with: python manage.py shell < create_test_data.py
+Run this with: python create_test_data.py
 """
 import os
+import sys
 import django
-from datetime import datetime, timedelta
-from django.utils import timezone
-import random
+
+# Add the project directory to the path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Setup Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'safenest.settings')
 django.setup()
 
+from datetime import datetime, timedelta
+from django.utils import timezone
+import random
 from access_control.models import AccessPoint, AccessLog, AccessSchedule, AccessPermission
 from core.models import User, Organization
 
 print("🚀 Creating test data for Access Control Management...")
 
-# Get or create organization
-org, _ = Organization.objects.get_or_create(
-    name='Test Organization',
-    defaults={'description': 'Testing organization for SafeNest'}
-)
-print(f"✅ Organization: {org.name}")
+# Get existing user by email
+try:
+    main_user = User.objects.get(email='nihedabdworks@gmail.com')
+    org = main_user.organization
+    print(f"✅ Using existing user: {main_user.username}")
+    print(f"✅ Organization: {org.name}")
+except User.DoesNotExist:
+    print("❌ Error: User with email 'nihedabdworks@gmail.com' not found!")
+    print("Please make sure you're logged in and have an account.")
+    sys.exit(1)
 
-# Create test users
+if not org:
+    print("❌ Error: User has no organization!")
+    sys.exit(1)
+
+# Create test users (including your main user)
 users_data = [
     {'username': 'john.doe', 'email': 'john@test.com', 'first_name': 'John', 'last_name': 'Doe'},
     {'username': 'jane.smith', 'email': 'jane@test.com', 'first_name': 'Jane', 'last_name': 'Smith'},
@@ -33,7 +45,11 @@ users_data = [
     {'username': 'david.brown', 'email': 'david@test.com', 'first_name': 'David', 'last_name': 'Brown'},
 ]
 
-users = []
+# Start with your main user
+users = [main_user]
+print(f"✅ Main User: {main_user.get_full_name() or main_user.username}")
+
+# Create additional test users
 for data in users_data:
     user, created = User.objects.get_or_create(
         username=data['username'],
@@ -46,8 +62,10 @@ for data in users_data:
     )
     if created:
         user.set_password('Test123!')
+        user.save()
     users.append(user)
-    print(f"✅ User: {user.get_full_name()}")
+    status = "✅ Created" if created else "ℹ️  Already exists"
+    print(f"{status}: {user.get_full_name() or user.username}")
 
 # Create access points
 access_points_data = [
@@ -290,9 +308,11 @@ print("   6. ❌ Multiple denied access attempts")
 print("   7. 📈 Rush hour traffic simulation")
 
 print("\n🔐 Test Credentials:")
-for user in users:
+print(f"   - Username: {main_user.username} | Email: {main_user.email} (Your account)")
+for user in users[1:]:  # Skip main user since we already printed it
     print(f"   - Username: {user.username} | Password: Test123!")
 
 print("\n🌐 Access the pages:")
 print("   - Access Points: http://localhost:3000/access-points")
 print("   - Login Events: http://localhost:3000/login-events")
+print("\n💡 Login with your account (nihedabdworks@gmail.com) to see all data!")

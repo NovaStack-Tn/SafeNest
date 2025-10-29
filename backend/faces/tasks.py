@@ -8,6 +8,8 @@ from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta
 from .models import FaceIdentity, FaceEmbedding, FaceDetection, Camera
+from access_control.models import AccessLog
+from django.contrib.auth import get_user_model
 from .ai import get_face_service
 
 logger = logging.getLogger(__name__)
@@ -211,6 +213,48 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
                         logger.info(f"Email alert sent for unknown person detection {detection_obj.id}")
                     except Exception as e:
                         logger.error(f"Failed to send email alert: {e}")
+                
+                # Create AccessLog if camera is linked to an AccessPoint
+                try:
+                    if camera.access_point:
+                        matched = bool(detection_data.get('is_match', False))
+                        user_obj = None
+                        # Best-effort user resolution from FaceIdentity.person_meta
+                        if detection_obj.identity and detection_data.get('person_meta'):
+                            meta = detection_data.get('person_meta') or {}
+                            User = get_user_model()
+                            for key in ['user_id', 'id']:
+                                uid = meta.get(key)
+                                if uid:
+                                    try:
+                                        user_obj = User.objects.get(id=uid)
+                                        break
+                                    except Exception:
+                                        pass
+                            if not user_obj:
+                                for key in ['username', 'email']:
+                                    val = meta.get(key)
+                                    if val:
+                                        try:
+                                            lookup = {key: val}
+                                            user_obj = User.objects.get(**lookup)
+                                            break
+                                        except Exception:
+                                            pass
+                        AccessLog.objects.create(
+                            organization=camera.organization,
+                            access_point=camera.access_point,
+                            user=user_obj,
+                            event_type='entry',
+                            is_granted=matched,
+                            denial_reason='' if matched else 'no_permission',
+                            timestamp=timezone.now(),
+                            direction='in',
+                            photo_url=detection_obj.frame_image.url if detection_obj.frame_image else '',
+                            device_info={'camera': camera.name}
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to create AccessLog from detection {detection_obj.id}: {e}")
         
         logger.info(f"Processed {len(detections)} faces from image")
         return detections
