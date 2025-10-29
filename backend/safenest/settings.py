@@ -19,7 +19,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
-
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 # Application definition
 INSTALLED_APPS = [
     'daphne',  # Must be first for Channels

@@ -26,8 +26,7 @@ scikit-learn==1.4.0
 numpy==1.26.4
 Pillow==10.2.0
 
-# OpenAI & LLM
-openai==1.10.0
+google-generativeai>=0.8.0
 
 # MinIO/S3
 minio==7.2.3
