@@ -6,9 +6,21 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.http import JsonResponse
+
+def health_check(request):
+    """Health check endpoint for deployment monitoring"""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'SafeNest Backend',
+        'version': '1.0.0'
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # Health check for deployment monitoring
+    path('api/health/', health_check, name='health_check'),
     
     # JWT Authentication
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
