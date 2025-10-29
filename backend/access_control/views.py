@@ -1,6 +1,7 @@
 """
 Access Control Views
 """
+import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,6 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db.models import Count, Q
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     AccessPoint,
@@ -182,7 +185,44 @@ class AccessLogViewSet(viewsets.ModelViewSet):
         ).select_related('access_point', 'user', 'credential')
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.organization)
+        access_log = serializer.save(organization=self.request.user.organization)
+        
+        # Automatic AI anomaly detection for granted accesses
+        if access_log.user and access_log.is_granted:
+            self._detect_anomalies(access_log)
+    
+    def _detect_anomalies(self, access_log):
+        """Detect anomalies using AI"""
+        from .ai_service import AccessAnomalyDetector
+        
+        try:
+            detector = AccessAnomalyDetector(access_log.organization)
+            anomaly = detector.analyze_user_access(access_log.user, access_log)
+            
+            if anomaly:
+                # Create anomaly record
+                AccessAnomaly.objects.create(
+                    organization=access_log.organization,
+                    access_log=access_log,
+                    user=access_log.user,
+                    anomaly_type=anomaly['type'],
+                    severity=anomaly['severity'],
+                    confidence_score=anomaly['confidence'],
+                    description=anomaly['description'],
+                    baseline_pattern=anomaly['baseline'],
+                    detected_pattern=anomaly['detected']
+                )
+                
+                # Update access log
+                access_log.is_anomaly = True
+                access_log.anomaly_score = anomaly['confidence']
+                access_log.save()
+                
+                logger.info(f"Anomaly detected: {anomaly['type']} for user {access_log.user.username}")
+                
+        except Exception as e:
+            # Don't fail the request if anomaly detection fails
+            logger.error(f"Anomaly detection failed: {e}")
 
     @action(detail=False, methods=['get'])
     def recent(self, request):
@@ -251,6 +291,17 @@ class AccessStatsViewSet(viewsets.ViewSet):
         org = request.user.organization
         today = timezone.now().date()
 
+        # Get hourly access distribution
+        from django.db.models.functions import ExtractHour
+        hour_distribution = AccessLog.objects.filter(
+            organization=org,
+            timestamp__date=today
+        ).annotate(hour=ExtractHour('timestamp')).values('hour').annotate(
+            count=Count('id')
+        ).order_by('hour')
+        
+        access_by_hour = {str(item['hour']): item['count'] for item in hour_distribution}
+
         stats = {
             'total_access_points': AccessPoint.objects.filter(organization=org).count(),
             'active_points': AccessPoint.objects.filter(organization=org, status='active').count(),
@@ -284,8 +335,66 @@ class AccessStatsViewSet(viewsets.ViewSet):
                 .annotate(count=Count('id'))
                 .order_by('-count')[:5]
             ),
-            'access_by_hour': {}
+            'access_by_hour': access_by_hour
         }
 
         serializer = AccessStatsSerializer(stats)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def analytics(self, request):
+        """Advanced analytics with AI predictions"""
+        from .ai_service import AccessPredictor
+        
+        org = request.user.organization
+        predictor = AccessPredictor(org)
+        
+        # Get busy hours prediction
+        busy_hours = predictor.predict_busy_hours()
+        
+        # Get optimization suggestions
+        suggestions = predictor.suggest_access_optimizations()
+        
+        # Weekly trend
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        daily_accesses = AccessLog.objects.filter(
+            organization=org,
+            timestamp__gte=seven_days_ago
+        ).extra({'date': 'date(timestamp)'}).values('date').annotate(
+            total=Count('id'),
+            granted=Count('id', filter=Q(is_granted=True)),
+            denied=Count('id', filter=Q(is_granted=False))
+        ).order_by('date')
+        
+        return Response({
+            'busy_hours_prediction': busy_hours,
+            'optimization_suggestions': suggestions,
+            'weekly_trend': list(daily_accesses),
+            'generated_at': timezone.now().isoformat()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def user_profile(self, request):
+        """Get behavioral profile for a specific user"""
+        from .ai_service import AccessAnomalyDetector
+        from core.models import User
+        
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=400)
+        
+        try:
+            user = User.objects.get(id=user_id, organization=request.user.organization)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+        
+        detector = AccessAnomalyDetector(request.user.organization)
+        profile = detector.get_user_behavior_profile(user)
+        
+        if not profile:
+            return Response({
+                'error': 'Insufficient data to generate profile',
+                'message': 'User needs at least 5 access events in the last 30 days'
+            }, status=400)
+        
+        return Response(profile)

@@ -15,6 +15,7 @@ import { Alerts } from './pages/Alerts';
 import { Incidents } from './pages/Incidents';
 import { Faces } from './pages/Faces';
 import { AccessPoints } from './pages/AccessPoints';
+import { LoginEvents } from './pages/LoginEvents';
 import { Cameras } from './pages/Cameras';
 import { CameraHistory } from './pages/CameraHistory';
 import { Visitors } from './pages/Visitors';
@@ -92,7 +93,7 @@ function App() {
             
             {/* Access Control */}
             <Route path="access-points" element={<AccessPoints />} />
-            <Route path="login-events" element={<ComingSoon title="Login Events" />} />
+            <Route path="login-events" element={<LoginEvents />} />
             
             {/* Surveillance */}
             <Route path="cameras" element={<Cameras />} />
