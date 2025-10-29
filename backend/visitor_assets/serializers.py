@@ -25,11 +25,26 @@ class VisitorSerializer(serializers.ModelSerializer):
             'host', 'host_name', 'purpose_of_visit', 'department_to_visit',
             'risk_score', 'is_on_watchlist', 'watchlist_reason', 'requires_escort',
             'background_check_status', 'nda_signed', 'nda_signed_at', 'agreements',
+            'ai_extracted', 'ai_confidence', 'ai_suggested_access_level', 'ai_predicted_duration', 'extracted_data',
             'notes', 'created_at', 'updated_at', 'visit_count', 'last_visit_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'visit_count', 'last_visit_at', 'risk_score']
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at', 'visit_count', 'last_visit_at', 'risk_score', 'full_name', 'host_name']
         extra_kwargs = {
             'face_embedding': {'write_only': True},
+            'email': {'required': False, 'allow_blank': True},
+            'phone': {'required': False, 'allow_blank': True},
+            'company': {'required': False, 'allow_blank': True},
+            'department_to_visit': {'required': False, 'allow_blank': True},
+            'id_type': {'required': False, 'allow_blank': True},
+            'id_number': {'required': False, 'allow_blank': True},
+            'photo_url': {'required': False, 'allow_blank': True},
+            'watchlist_reason': {'required': False, 'allow_blank': True},
+            'notes': {'required': False, 'allow_blank': True},
+            'host': {'required': False, 'allow_null': True},
+            'ai_suggested_access_level': {'required': False, 'allow_blank': True},
+            'ai_confidence': {'required': False, 'allow_null': True},
+            'ai_predicted_duration': {'required': False, 'allow_null': True},
+            'nda_signed_at': {'required': False, 'allow_null': True},
         }
 
 
@@ -66,7 +81,16 @@ class AssetSerializer(serializers.ModelSerializer):
             'assigned_to', 'assigned_to_name', 'assigned_at',
             'photo_url', 'qr_code', 'meta', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'predicted_failure_date', 'failure_probability']
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at', 'predicted_failure_date', 'failure_probability', 'assigned_to_name']
+        extra_kwargs = {
+            'current_location': {'required': False, 'allow_blank': True, 'default': 'Warehouse'},
+            'home_location': {'required': False, 'allow_blank': True, 'default': 'Warehouse'},
+            'serial_number': {'required': False, 'allow_blank': True},
+            'manufacturer': {'required': False, 'allow_blank': True},
+            'model': {'required': False, 'allow_blank': True},
+            'description': {'required': False, 'allow_blank': True},
+            'assigned_to': {'required': False, 'allow_null': True},
+        }
 
 
 class AssetAssignmentSerializer(serializers.ModelSerializer):

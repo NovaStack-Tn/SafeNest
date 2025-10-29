@@ -27,6 +27,7 @@ from .serializers import (
     VisitorStatsSerializer,
     AssetStatsSerializer,
 )
+from .ai_service import VisitorAIService
 
 
 class VisitorViewSet(viewsets.ModelViewSet):
@@ -97,6 +98,88 @@ class VisitorViewSet(viewsets.ModelViewSet):
         visitor.watchlist_reason = request.data.get('reason', '')
         visitor.save()
         return Response({'status': 'added to watchlist'})
+    
+    # AI-Powered Endpoints (Gemini 2.5 Flash)
+    
+    @action(detail=False, methods=['post'], url_path='ai-extract')
+    def ai_extract_info(self, request):
+        """
+        Extract visitor information from text using AI
+        POST /api/visitors/visitors/ai-extract/
+        Body: {"text": "Email content", "source_type": "email|form|message"}
+        """
+        text = request.data.get('text')
+        source_type = request.data.get('source_type', 'email')
+        
+        if not text:
+            return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        ai_service = VisitorAIService()
+        result = ai_service.extract_visitor_info(text=text, source_type=source_type)
+        
+        return Response(result)
+    
+    @action(detail=False, methods=['post'], url_path='ai-suggest-access')
+    def ai_suggest_access_level(self, request):
+        """
+        Get AI suggestion for visitor access level
+        POST /api/visitors/visitors/ai-suggest-access/
+        """
+        ai_service = VisitorAIService()
+        result = ai_service.suggest_access_level(request.data)
+        return Response(result)
+    
+    @action(detail=False, methods=['post'], url_path='ai-predict-duration')
+    def ai_predict_duration(self, request):
+        """
+        Predict visit duration using AI
+        POST /api/visitors/visitors/ai-predict-duration/
+        """
+        ai_service = VisitorAIService()
+        result = ai_service.predict_visit_duration(request.data)
+        return Response(result)
+    
+    @action(detail=False, methods=['post'], url_path='ai-autofill')
+    def ai_autofill_form(self, request):
+        """
+        Auto-fill visitor form using AI
+        POST /api/visitors/visitors/ai-autofill/
+        """
+        partial_data = request.data.get('partial_data', {})
+        context = request.data.get('context', '')
+        
+        ai_service = VisitorAIService()
+        result = ai_service.auto_fill_visitor_form(
+            partial_data=partial_data,
+            context=context
+        )
+        return Response(result)
+    
+    @action(detail=True, methods=['post'], url_path='analyze-risk')
+    def analyze_risk(self, request, pk=None):
+        """
+        Analyze visitor risk using AI
+        POST /api/visitors/visitors/{id}/analyze-risk/
+        """
+        visitor = self.get_object()
+        
+        # Get historical data for this visitor
+        historical = Visitor.objects.filter(
+            organization=request.user.organization,
+            email=visitor.email
+        ).exclude(id=visitor.id).values(
+            'visitor_type', 'purpose_of_visit', 'status', 'created_at'
+        )
+        
+        visitor_data = VisitorSerializer(visitor).data
+        
+        ai_service = VisitorAIService()
+        result = ai_service.analyze_visitor_risk(
+            visitor_data=visitor_data,
+            historical_data=list(historical) if historical.exists() else None
+        )
+        
+        return Response(result)
 
     @action(detail=False, methods=['get'])
     def on_premises(self, request):

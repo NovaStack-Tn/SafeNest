@@ -20,7 +20,7 @@ urlpatterns = [
     path('api/security/', include('security.urls')),
     path('api/incidents/', include('incidents.urls')),
     path('api/faces/', include('faces.urls')),
-    path('api/visitors/', include('visitor_assets.urls')),
+    path('api/visitor-assets/', include('visitor_assets.urls')),  # Visitor & Asset Management with AI
     path('api/llm/', include('llm.urls')),
     path('api/dashboard/', include('dashboard.urls')),
 ]
