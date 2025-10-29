@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X, CheckCircle } from 'lucide-react';
 import { Card } from './Card';
@@ -6,14 +6,13 @@ import type { Alert } from '@/lib/types';
 
 export const RealtimeAlerts = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [ws, setWs] = useState<WebSocket | null>(null);
 
+  // WebSocket is temporarily disabled due to JWT authentication issues
+  // TODO: Implement JWT WebSocket authentication middleware
+  // For now, the Alerts page uses polling instead
+  
+  /* Disabled WebSocket code:
   useEffect(() => {
-    // WebSocket is temporarily disabled due to JWT authentication issues
-    // TODO: Implement JWT WebSocket authentication middleware
-    // For now, the Alerts page uses polling instead
-    
-    /* Disabled WebSocket code:
     const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
     const token = localStorage.getItem('access_token');
     
@@ -40,13 +39,11 @@ export const RealtimeAlerts = () => {
       console.log('WebSocket disconnected');
     };
 
-    setWs(websocket);
-
     return () => {
       websocket.close();
     };
-    */
   }, []);
+  */
 
   const removeAlert = (id: number) => {
     setAlerts((prev) => prev.filter((alert) => alert.id !== id));

@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X, Shield, Clock, User, FileText, Paperclip, Activity,
-  CheckCircle, AlertTriangle, Sparkles, Upload, Download
+  CheckCircle, Sparkles, Upload, Download
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Card } from './Card';
 import { Button } from './Button';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import type { Incident, IncidentEvent, Evidence, IncidentResolution } from '@/lib/types';
+import type { Incident, IncidentEvent, Evidence } from '@/lib/types';
 
 interface IncidentDetailModalProps {
   isOpen: boolean;

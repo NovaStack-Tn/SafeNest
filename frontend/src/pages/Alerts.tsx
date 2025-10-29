@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, TrendingUp, CheckCircle } from 'lucide-react';
@@ -15,7 +15,6 @@ export const Alerts = () => {
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState('all');
   const [status, setStatus] = useState('all');
-  const [ws, setWs] = useState<WebSocket | null>(null);
 
   // Fetch alerts
   const { data: alerts, isLoading, error } = useQuery<Alert[]>({
@@ -35,10 +34,6 @@ export const Alerts = () => {
 
   // WebSocket temporarily disabled - using polling instead
   // TODO: Implement JWT WebSocket authentication
-  useEffect(() => {
-    // Placeholder for future WebSocket implementation
-    setWs(null);
-  }, [queryClient]);
 
   // Acknowledge alert mutation
   const acknowledgeMutation = useMutation({
