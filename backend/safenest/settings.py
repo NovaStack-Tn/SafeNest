@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'security.apps.SecurityConfig',
     'incidents.apps.IncidentsConfig',
     'faces.apps.FacesConfig',
-    'visitor_assets.apps.VisitorAssetsConfig',
+    'visitor_assets.apps.VisitorAssetsConfig',  # 👥 Visitors & Assets
     'llm.apps.LlmConfig',
     'dashboard.apps.DashboardConfig',
 ]

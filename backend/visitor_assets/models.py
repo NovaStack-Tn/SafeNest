@@ -85,6 +85,13 @@ class Visitor(models.Model):
     nda_signed_at = models.DateTimeField(null=True, blank=True)
     agreements = models.JSONField(default=list, blank=True, help_text="List of signed agreements")
     
+    # AI-Enhanced Fields (Gemini 2.5 Flash)
+    ai_extracted = models.BooleanField(default=False, help_text="Was info extracted by AI?")
+    ai_confidence = models.FloatField(null=True, blank=True, help_text="AI extraction confidence score")
+    ai_suggested_access_level = models.CharField(max_length=50, blank=True)
+    ai_predicted_duration = models.IntegerField(null=True, blank=True, help_text="Predicted visit duration in minutes")
+    extracted_data = models.JSONField(default=dict, blank=True, help_text="Raw AI extraction data")
+    
     # Metadata
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
