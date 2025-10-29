@@ -22,7 +22,7 @@ class AccessPointSerializer(serializers.ModelSerializer):
             'allow_tailgating_detection', 'max_access_attempts', 'lockdown_enabled',
             'latitude', 'longitude', 'meta', 'created_at', 'updated_at', 'last_activity_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'last_activity_at']
+        read_only_fields = ['organization', 'created_at', 'updated_at', 'last_activity_at']
 
 
 class AccessScheduleSerializer(serializers.ModelSerializer):
@@ -34,7 +34,7 @@ class AccessScheduleSerializer(serializers.ModelSerializer):
             'exclude_holidays', 'holiday_calendar', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['organization', 'created_at', 'updated_at']
 
 
 class AccessPermissionSerializer(serializers.ModelSerializer):
@@ -52,7 +52,7 @@ class AccessPermissionSerializer(serializers.ModelSerializer):
             'is_active', 'is_revoked', 'revoked_at', 'revoked_by', 'revocation_reason',
             'granted_by', 'granted_by_name', 'granted_at', 'notes'
         ]
-        read_only_fields = ['granted_at', 'revoked_at']
+        read_only_fields = ['organization', 'granted_at', 'revoked_at']
 
 
 class AccessCredentialSerializer(serializers.ModelSerializer):
@@ -65,7 +65,7 @@ class AccessCredentialSerializer(serializers.ModelSerializer):
             'status', 'issued_at', 'expires_at', 'last_used_at',
             'failed_attempts', 'is_locked', 'locked_until', 'notes'
         ]
-        read_only_fields = ['issued_at', 'last_used_at', 'failed_attempts']
+        read_only_fields = ['organization', 'issued_at', 'last_used_at', 'failed_attempts']
         extra_kwargs = {
             'biometric_template': {'write_only': True},
             'pin_code': {'write_only': True},
@@ -87,7 +87,7 @@ class AccessLogSerializer(serializers.ModelSerializer):
             'direction', 'companion_count', 'latitude', 'longitude',
             'device_info', 'photo_url', 'video_clip_url', 'notes'
         ]
-        read_only_fields = ['timestamp']
+        read_only_fields = ['organization', 'timestamp']
 
 
 class AccessAnomalySerializer(serializers.ModelSerializer):
@@ -104,7 +104,7 @@ class AccessAnomalySerializer(serializers.ModelSerializer):
             'is_reviewed', 'is_false_positive', 'reviewed_by', 'reviewed_by_name',
             'reviewed_at', 'review_notes', 'detected_at'
         ]
-        read_only_fields = ['detected_at']
+        read_only_fields = ['organization', 'detected_at']
 
 
 # Stats and analytics serializers
