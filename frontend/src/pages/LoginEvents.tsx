@@ -421,6 +421,34 @@ export const LoginEvents = () => {
           </div>
         </Card>
 
+        {/* AI Suggestions */}
+        <Card className="p-6">
+          <div className="flex items-center mb-4">
+            <TrendingUp className="w-5 h-5 text-blue-600 mr-2" />
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+              AI Suggestions
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {suggestions.slice(0, 3).map((suggestion, idx) => (
+              <div key={idx} className={`p-3 rounded-lg border-l-4 ${
+                suggestion.priority === 'high' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
+                suggestion.priority === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10' :
+                'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+              }`}>
+                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
+                  {suggestion.type.replace('_', ' ')}
+                </p>
+                <p className="text-sm text-gray-900 dark:text-white mt-1">
+                  {suggestion.suggestion}
+                </p>
+              </div>
+            ))}
+            {suggestions.length === 0 && (
+              <p className="text-center text-gray-500 py-4">No suggestions yet</p>
+            )}
+          </div>
+        </Card>
       </div>
 
       {/* Filters */}
