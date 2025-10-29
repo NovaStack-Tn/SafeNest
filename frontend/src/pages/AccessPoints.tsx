@@ -1,8 +1,8 @@
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
-import { 
-  DoorOpen, Plus, MapPin, Clock, Edit2, Trash2, Lock, Unlock,
-  Search, X, Activity, CheckCircle, AlertCircle
+import {
+  DoorOpen, Plus, Edit2, Trash2, Lock, Unlock, Search,
+  Activity, CheckCircle, Sparkles, MapPin, X
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,6 +32,14 @@ interface Stats {
   today_granted: number;
 }
 
+interface AISuggestion {
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  category: string;
+  icon: string;
+}
+
 export const AccessPoints = () => {
   const [accessPoints, setAccessPoints] = useState<AccessPoint[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -40,6 +48,8 @@ export const AccessPoints = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingPoint, setEditingPoint] = useState<AccessPoint | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [loadingAI, setLoadingAI] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     point_type: 'door',
@@ -52,6 +62,7 @@ export const AccessPoints = () => {
 
   useEffect(() => {
     fetchData();
+    fetchAISuggestions();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -81,6 +92,27 @@ export const AccessPoints = () => {
       setAccessPoints([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAISuggestions = async () => {
+    try {
+      setLoadingAI(true);
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(
+        'http://localhost:8000/api/access-control/stats/gemini_suggestions/',
+        { headers }
+      );
+
+      setAiSuggestions(response.data.suggestions || []);
+    } catch (error) {
+      console.error('Error fetching AI suggestions:', error);
+      setAiSuggestions([]);
+    } finally {
+      setLoadingAI(false);
     }
   };
 
@@ -227,6 +259,59 @@ export const AccessPoints = () => {
           Add Access Point
         </Button>
       </div>
+
+      {/* AI Suggestions Bubble */}
+      {aiSuggestions.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-6 text-white shadow-lg"
+        >
+          <div className="flex items-start gap-4">
+            <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                🤖 AI Recommendations
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                  Powered by Gemini
+                </span>
+              </h3>
+              <div className="space-y-3">
+                {aiSuggestions.slice(0, 3).map((suggestion, index) => (
+                  <div key={index} className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="text-2xl">{
+                        suggestion.icon === 'shield' ? '🛡️' :
+                        suggestion.icon === 'clock' ? '⏰' :
+                        suggestion.icon === 'users' ? '👥' :
+                        suggestion.icon === 'zap' ? '⚡' : '💡'
+                      }</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{suggestion.title}</h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            suggestion.priority === 'high' ? 'bg-red-500/30' :
+                            suggestion.priority === 'medium' ? 'bg-yellow-500/30' :
+                            'bg-green-500/30'
+                          }`}>
+                            {suggestion.priority}
+                          </span>
+                        </div>
+                        <p className="text-sm text-white/90">{suggestion.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {loadingAI && (
+                <p className="text-sm text-white/70 mt-2">Loading more suggestions...</p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

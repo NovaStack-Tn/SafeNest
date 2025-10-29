@@ -50,17 +50,30 @@ interface Suggestion {
   suggestion: string;
 }
 
+interface AIAlert {
+  title: string;
+  message: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  action: string;
+  affected_count: number;
+}
+
 export const LoginEvents = () => {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [busyHours, setBusyHours] = useState<BusyHour[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [aiAlerts, setAiAlerts] = useState<AIAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAI, setLoadingAI] = useState(false);
   const [filter, setFilter] = useState<'all' | 'granted' | 'denied' | 'anomaly'>('all');
   const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const [nameFilter, setNameFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   
   useEffect(() => {
     fetchData();
+    fetchAIAlerts();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [timeRange]);
@@ -103,10 +116,49 @@ export const LoginEvents = () => {
     }
   };
 
+  const fetchAIAlerts = async () => {
+    try {
+      setLoadingAI(true);
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      const headers = { Authorization: `Bearer ${token}` };
+      const hoursMap = { '24h': 24, '7d': 168, '30d': 720 };
+      
+      const response = await axios.get(
+        `http://localhost:8000/api/access-control/stats/gemini_alerts/?hours=${hoursMap[timeRange]}`,
+        { headers }
+      );
+
+      setAiAlerts(response.data.alerts || []);
+    } catch (error) {
+      console.error('Error fetching AI alerts:', error);
+      setAiAlerts([]);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
   const filteredLogs = logs.filter(log => {
-    if (filter === 'granted') return log.is_granted;
-    if (filter === 'denied') return !log.is_granted;
-    if (filter === 'anomaly') return log.is_anomaly;
+    // Event type filter
+    if (filter === 'granted' && !log.is_granted) return false;
+    if (filter === 'denied' && log.is_granted) return false;
+    if (filter === 'anomaly' && !log.is_anomaly) return false;
+    
+    // Name filter
+    if (nameFilter) {
+      const searchLower = nameFilter.toLowerCase();
+      const matchesUser = log.user_name?.toLowerCase().includes(searchLower);
+      const matchesPoint = log.access_point_name?.toLowerCase().includes(searchLower);
+      if (!matchesUser && !matchesPoint) return false;
+    }
+    
+    // Date filter
+    if (dateFilter) {
+      const logDate = new Date(log.timestamp).toISOString().split('T')[0];
+      if (logDate !== dateFilter) return false;
+    }
+    
     return true;
   });
 
@@ -188,6 +240,67 @@ export const LoginEvents = () => {
           </Button>
         </div>
       </div>
+
+      {/* AI Security Alerts - Gemini Powered */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`rounded-2xl p-6 text-white shadow-lg ${
+          aiAlerts.length > 0 && aiAlerts[0].severity !== 'low' 
+            ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500'
+            : 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500'
+        }`}
+      >
+        <div className="flex items-start gap-4">
+          <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+              🚨 AI Security Alerts
+              <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                Powered by Gemini
+              </span>
+            </h3>
+            {aiAlerts.length > 0 ? (
+              <div className="space-y-3">
+                {aiAlerts.slice(0, 3).map((alert, index) => (
+                  <div key={index} className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="text-2xl">
+                        {alert.severity === 'critical' ? '🔴' :
+                         alert.severity === 'high' ? '🟠' :
+                         alert.severity === 'medium' ? '🟡' : '🟢'}
+                      </span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{alert.title}</h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            alert.severity === 'critical' ? 'bg-red-700/50' :
+                            alert.severity === 'high' ? 'bg-orange-600/50' :
+                            alert.severity === 'medium' ? 'bg-yellow-600/50' :
+                            'bg-green-600/50'
+                          }`}>
+                            {alert.severity}
+                          </span>
+                        </div>
+                        <p className="text-sm text-white/90 mb-1">{alert.message}</p>
+                        <p className="text-xs text-white/70">→ {alert.action}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                <p className="text-sm text-white/90">
+                  {loadingAI ? 'Analyzing security patterns...' : 'Loading security insights...'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -308,83 +421,91 @@ export const LoginEvents = () => {
           </div>
         </Card>
 
-        {/* AI Suggestions */}
-        <Card className="p-6">
-          <div className="flex items-center mb-4">
-            <TrendingUp className="w-5 h-5 text-blue-600 mr-2" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              AI Suggestions
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {suggestions.slice(0, 3).map((suggestion, idx) => (
-              <div key={idx} className={`p-3 rounded-lg border-l-4 ${
-                suggestion.priority === 'high' ? 'border-red-500 bg-red-50 dark:bg-red-900/10' :
-                suggestion.priority === 'medium' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10' :
-                'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
-              }`}>
-                <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase">
-                  {suggestion.type.replace('_', ' ')}
-                </p>
-                <p className="text-sm text-gray-900 dark:text-white mt-1">
-                  {suggestion.suggestion}
-                </p>
-              </div>
-            ))}
-            {suggestions.length === 0 && (
-              <p className="text-center text-gray-500 py-4">No suggestions yet</p>
-            )}
-          </div>
-        </Card>
       </div>
 
       {/* Filters */}
       <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Filter className="w-5 h-5 text-gray-400" />
-            <div className="flex space-x-2">
-              <Button
-                size="sm"
-                variant={filter === 'all' ? 'primary' : 'secondary'}
-                onClick={() => setFilter('all')}
+        <div className="space-y-4">
+          {/* Event Type Filters */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Filter className="w-5 h-5 text-gray-400" />
+              <div className="flex space-x-2">
+                <Button
+                  size="sm"
+                  variant={filter === 'all' ? 'primary' : 'secondary'}
+                  onClick={() => setFilter('all')}
+                >
+                  All ({logs.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={filter === 'granted' ? 'primary' : 'secondary'}
+                  onClick={() => setFilter('granted')}
+                >
+                  ✓ Granted ({logs.filter(l => l.is_granted).length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={filter === 'denied' ? 'primary' : 'secondary'}
+                  onClick={() => setFilter('denied')}
+                >
+                  ✗ Denied ({logs.filter(l => !l.is_granted).length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={filter === 'anomaly' ? 'primary' : 'secondary'}
+                  onClick={() => setFilter('anomaly')}
+                >
+                  ⚡ Anomalies ({logs.filter(l => l.is_anomaly).length})
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-gray-400" />
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value as any)}
+                className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
               >
-                All ({logs.length})
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'granted' ? 'primary' : 'secondary'}
-                onClick={() => setFilter('granted')}
-              >
-                ✓ Granted ({logs.filter(l => l.is_granted).length})
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'denied' ? 'primary' : 'secondary'}
-                onClick={() => setFilter('denied')}
-              >
-                ✗ Denied ({logs.filter(l => !l.is_granted).length})
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'anomaly' ? 'primary' : 'secondary'}
-                onClick={() => setFilter('anomaly')}
-              >
-                ⚡ Anomalies ({logs.filter(l => l.is_anomaly).length})
-              </Button>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+              </select>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-gray-400" />
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
-            >
-              <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-            </select>
+
+          {/* Search Filters */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search by user name or access point..."
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <div className="w-48">
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            {(nameFilter || dateFilter) && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setNameFilter('');
+                  setDateFilter('');
+                }}
+              >
+                Clear
+              </Button>
+            )}
           </div>
         </div>
       </Card>
