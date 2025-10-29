@@ -1,0 +1,146 @@
+databases:
+  - name: safenest-db
+    databaseName: safenest
+    user: safenest
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  # Redis for Celery & Channels
+  - type: redis
+    name: safenest-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  # Main Django Web Service
+  - type: web
+    name: safenest-backend
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn safenest.wsgi:application"
+    rootDir: backend
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      
+      - key: DEBUG
+        value: "False"
+      
+      - key: ALLOWED_HOSTS
+        sync: false
+      
+      - key: DATABASE_URL
+        fromDatabase:
+          name: safenest-db
+          property: connectionString
+      
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: safenest-redis
+          property: connectionString
+      
+      # Celery/Channels Redis
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: safenest-redis
+          property: connectionString
+      
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: safenest-redis
+          property: host
+      
+      # CORS Configuration
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      
+      # AI API Keys (set these in Render dashboard)
+      - key: GEMINI_API_KEY
+        sync: false
+      
+      # MinIO/S3 Configuration (if using external storage)
+      - key: MINIO_ENDPOINT
+        sync: false
+      
+      - key: MINIO_ACCESS_KEY
+        sync: false
+      
+      - key: MINIO_SECRET_KEY
+        sync: false
+      
+      - key: MINIO_SECURE
+        value: "True"
+      
+      - key: MINIO_BUCKET
+        value: "safenest"
+      
+      # Email Configuration (optional)
+      - key: EMAIL_BACKEND
+        value: "django.core.mail.backends.smtp.EmailBackend"
+      
+      - key: EMAIL_HOST
+        sync: false
+      
+      - key: EMAIL_PORT
+        value: "587"
+      
+      - key: EMAIL_USE_TLS
+        value: "True"
+      
+      - key: EMAIL_HOST_USER
+        sync: false
+      
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+
+  # Celery Worker (Background Tasks)
+  - type: worker
+    name: safenest-celery-worker
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A safenest worker --loglevel=info"
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: safenest-db
+          property: connectionString
+      
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: safenest-redis
+          property: connectionString
+      
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # Celery Beat (Scheduled Tasks)
+  - type: worker
+    name: safenest-celery-beat
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A safenest beat --loglevel=info"
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: safenest-db
+          property: connectionString
+      
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: safenest-redis
+          property: connectionString
