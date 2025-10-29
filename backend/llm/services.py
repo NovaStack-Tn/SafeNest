@@ -1,21 +1,44 @@
 """
-LLM service with OpenAI integration and tool calling.
+LLM service with Google Gemini integration and tool calling.
 """
 import logging
 import json
 from typing import List, Dict, Any
 from django.conf import settings
-import openai
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
+# Configure Gemini
+if hasattr(settings, 'GEMINI_API_KEY'):
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+
 
 class LLMService:
-    """Service for interacting with OpenAI LLM."""
+    """Service for interacting with Google Gemini LLM."""
     
     def __init__(self):
-        openai.api_key = settings.OPENAI_API_KEY
-        self.model = settings.OPENAI_MODEL
+        self.model = 'models/gemini-2.5-flash'
+    
+    def _convert_tools_to_gemini_format(self, openai_tools: List[Dict]) -> List[Dict]:
+        """Convert OpenAI tool format to Gemini function declarations."""
+        import google.generativeai as genai
+        
+        function_declarations = []
+        for tool in openai_tools:
+            if tool.get('type') == 'function':
+                func = tool['function']
+                
+                # Create FunctionDeclaration using genai types
+                function_declarations.append(
+                    genai.types.FunctionDeclaration(
+                        name=func['name'],
+                        description=func['description'],
+                        parameters=func.get('parameters', {})
+                    )
+                )
+        
+        return function_declarations
     
     def chat_completion(
         self,
@@ -25,11 +48,11 @@ class LLMService:
         max_tokens: int = 1000
     ) -> Dict[str, Any]:
         """
-        Get chat completion from OpenAI.
+        Get chat completion from Google Gemini.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
-            tools: List of tool definitions for function calling
+            tools: List of tool definitions for function calling (OpenAI format)
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response
         
@@ -37,40 +60,88 @@ class LLMService:
             Response dict with message and optional tool calls
         """
         try:
-            kwargs = {
-                'model': self.model,
-                'messages': messages,
-                'temperature': temperature,
-                'max_tokens': max_tokens,
+            # Separate system prompt from conversation
+            system_prompt = None
+            conversation_messages = []
+            
+            for msg in messages:
+                if msg['role'] == 'system':
+                    system_prompt = msg['content']
+                else:
+                    conversation_messages.append(msg)
+            
+            # Build Gemini chat history
+            history = []
+            for msg in conversation_messages[:-1]:  # Exclude last user message
+                role = 'user' if msg['role'] == 'user' else 'model'
+                history.append({
+                    'role': role,
+                    'parts': [msg['content']]
+                })
+            
+            # Get last user message
+            last_message = conversation_messages[-1]['content'] if conversation_messages else ''
+            
+            # Create model with optional tools
+            model_kwargs = {
+                'model_name': self.model,
             }
             
+            if system_prompt:
+                model_kwargs['system_instruction'] = system_prompt
+            
             if tools:
-                kwargs['tools'] = tools
-                kwargs['tool_choice'] = 'auto'
+                # Convert OpenAI tools to Gemini format
+                gemini_tools = self._convert_tools_to_gemini_format(tools)
+                model_kwargs['tools'] = gemini_tools
             
-            response = openai.chat.completions.create(**kwargs)
+            model = genai.GenerativeModel(**model_kwargs)
             
-            message = response.choices[0].message
+            # Start chat with history
+            chat = model.start_chat(history=history)
+            
+            # Send message
+            response = chat.send_message(
+                last_message,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                )
+            )
             
             result = {
-                'content': message.content,
-                'role': message.role,
+                'content': '',
+                'role': 'assistant',
                 'tool_calls': []
             }
             
-            # Extract tool calls if present
-            if hasattr(message, 'tool_calls') and message.tool_calls:
-                for tool_call in message.tool_calls:
-                    result['tool_calls'].append({
-                        'id': tool_call.id,
-                        'name': tool_call.function.name,
-                        'arguments': json.loads(tool_call.function.arguments)
-                    })
+            # Check for function calls in response
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    # Check if part has text
+                    if hasattr(part, 'text') and part.text:
+                        result['content'] = part.text
+                    
+                    # Check if part has function call
+                    if hasattr(part, 'function_call') and part.function_call:
+                        func_call = part.function_call
+                        # Convert Gemini function call to OpenAI format
+                        args_dict = {}
+                        if func_call.args:
+                            args_dict = dict(func_call.args)
+                        
+                        result['tool_calls'].append({
+                            'id': f'call_{func_call.name}',
+                            'name': func_call.name,
+                            'arguments': args_dict
+                        })
             
             return result
-            
+        
         except Exception as e:
             logger.error(f"Error in chat completion: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 'content': f"Error: {str(e)}",
                 'role': 'assistant',
@@ -79,20 +150,21 @@ class LLMService:
     
     def create_embedding(self, text: str) -> List[float]:
         """
-        Create embedding vector for text using OpenAI.
+        Create embedding vector for text using Gemini.
         
         Args:
             text: Text to embed
         
         Returns:
-            Embedding vector (1536-dim for ada-002)
+            Embedding vector (768-dim for Gemini embeddings)
         """
         try:
-            response = openai.embeddings.create(
-                model="text-embedding-ada-002",
-                input=text
+            result = genai.embed_content(
+                model="models/embedding-001",
+                content=text,
+                task_type="retrieval_document"
             )
-            return response.data[0].embedding
+            return result['embedding']
         except Exception as e:
             logger.error(f"Error creating embedding: {e}")
             return []
@@ -114,13 +186,13 @@ class AssistantBotService:
                 'type': 'function',
                 'function': {
                     'name': 'search_logs',
-                    'description': 'Search login events and alerts by query and time range',
+                    'description': 'Search login events and alerts by query and time range. If no specific query is provided, returns all events in the time range.',
                     'parameters': {
                         'type': 'object',
                         'properties': {
                             'query': {
                                 'type': 'string',
-                                'description': 'Search query for logs'
+                                'description': 'Search query for logs (optional, use empty string for all events)'
                             },
                             'time_range': {
                                 'type': 'string',
@@ -133,7 +205,7 @@ class AssistantBotService:
                                 'description': 'Type of events to search'
                             }
                         },
-                        'required': ['query']
+                        'required': []
                     }
                 }
             },
@@ -244,16 +316,33 @@ Always provide actionable insights."""
         
         # Execute tool calls if any
         tool_results = []
+        final_content = response['content']
+        
         if response['tool_calls']:
+            # Execute all tools
             for tool_call in response['tool_calls']:
                 result = self._execute_tool(tool_call['name'], tool_call['arguments'])
                 tool_results.append({
                     'tool': tool_call['name'],
                     'result': result
                 })
+            
+            # Send tool results back to get natural language response
+            messages.append({'role': 'assistant', 'content': response['content'] or 'Using tools...'})
+            
+            # Format tool results for the model
+            tool_results_text = "Tool Results:\n"
+            for tr in tool_results:
+                tool_results_text += f"\n{tr['tool']}:\n{json.dumps(tr['result'], indent=2)}\n"
+            
+            messages.append({'role': 'user', 'content': f"{tool_results_text}\n\nPlease summarize these results in a clear, conversational way for the user."})
+            
+            # Get final natural language response
+            final_response = self.llm.chat_completion(messages, tools=None)
+            final_content = final_response['content']
         
         return {
-            'content': response['content'],
+            'content': final_content,
             'tool_results': tool_results
         }
     

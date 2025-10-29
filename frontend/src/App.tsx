@@ -15,7 +15,9 @@ import { Alerts } from './pages/Alerts';
 import { Incidents } from './pages/Incidents';
 import { Faces } from './pages/Faces';
 import { AccessPoints } from './pages/AccessPoints';
+import { LoginEvents } from './pages/LoginEvents';
 import { Cameras } from './pages/Cameras';
+import { CameraHistory } from './pages/CameraHistory';
 import { Visitors } from './pages/Visitors';
 import { Assets } from './pages/Assets';
 import { ThreatIntel } from './pages/ThreatIntel';
@@ -28,6 +30,7 @@ import {
   Watchlist,
   ThreatHunting
 } from './pages/ThreatIntelligence';
+import { Settings } from './pages/Settings';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -99,10 +102,11 @@ function App() {
             
             {/* Access Control */}
             <Route path="access-points" element={<AccessPoints />} />
-            <Route path="login-events" element={<ComingSoon title="Login Events" />} />
+            <Route path="login-events" element={<LoginEvents />} />
             
             {/* Surveillance */}
             <Route path="cameras" element={<Cameras />} />
+            <Route path="camera-history" element={<CameraHistory />} />
             <Route path="faces" element={<Faces />} />
             
             {/* Incident Management */}
@@ -123,7 +127,7 @@ function App() {
             
             {/* AI & Tools */}
             <Route path="chat" element={<Chat />} />
-            <Route path="settings" element={<ComingSoon title="Settings" />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
 
           {/* 404 Route */}
@@ -158,21 +162,5 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-// Temporary Coming Soon Component
-const ComingSoon = ({ title }: { title: string }) => {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          {title}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          This feature is coming soon...
-        </p>
-      </div>
-    </div>
-  );
-};
 
 export default App;

@@ -34,7 +34,7 @@ urlpatterns = [
     
     # API endpoints
     path('api/', include('core.urls')),
-    path('api/access/', include('access_control.urls')),
+    path('api/access-control/', include('access_control.urls')),
     path('api/security/', include('security.urls')),
     path('api/incidents/', include('incidents.urls')),
     path('api/faces/', include('faces.urls')),

@@ -7,6 +7,7 @@ from django.contrib.postgres.fields import ArrayField
 # Temporarily disabled - install pgvector extension first
 # from pgvector.django import VectorField
 from django.utils.translation import gettext_lazy as _
+from access_control.models import AccessPoint
 
 User = get_user_model()
 
@@ -23,6 +24,16 @@ class Camera(models.Model):
     location = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     active = models.BooleanField(default=True)
+    
+    # Mapping to Access Control: which access point this camera observes
+    access_point = models.ForeignKey(
+        AccessPoint,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cameras',
+        help_text="Optional: link this camera to an access point"
+    )
     
     # Configuration
     detection_interval = models.IntegerField(

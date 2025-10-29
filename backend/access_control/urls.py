@@ -11,12 +11,12 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register(r'points', AccessPointViewSet, basename='access-point')
+router.register(r'access-points', AccessPointViewSet, basename='access-point')
 router.register(r'schedules', AccessScheduleViewSet, basename='access-schedule')
 router.register(r'permissions', AccessPermissionViewSet, basename='access-permission')
 router.register(r'credentials', AccessCredentialViewSet, basename='access-credential')
-router.register(r'logs', AccessLogViewSet, basename='access-log')
-router.register(r'anomalies', AccessAnomalyViewSet, basename='access-anomaly')
+router.register(r'access-logs', AccessLogViewSet, basename='access-log')
+router.register(r'access-anomalies', AccessAnomalyViewSet, basename='access-anomaly')
 router.register(r'stats', AccessStatsViewSet, basename='access-stats')
 
 urlpatterns = [

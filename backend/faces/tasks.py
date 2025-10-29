@@ -8,6 +8,8 @@ from django.utils import timezone
 from django.db.models import Q
 from datetime import timedelta
 from .models import FaceIdentity, FaceEmbedding, FaceDetection, Camera
+from access_control.models import AccessLog
+from django.contrib.auth import get_user_model
 from .ai import get_face_service
 
 logger = logging.getLogger(__name__)
@@ -152,7 +154,13 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
             
             # Create detection record
             if create_detection and camera:
-                FaceDetection.objects.create(
+                # Crop face from original image
+                from PIL import Image
+                from django.core.files.base import ContentFile
+                import io
+                from datetime import datetime
+                
+                detection_obj = FaceDetection(
                     camera=camera,
                     bbox=bbox,
                     confidence=detection_data['confidence'],
@@ -164,6 +172,89 @@ def detect_faces_in_image(image_path, camera_id=None, organization_id=None, crea
                     gender=detection_data.get('gender'),
                     landmarks=detection_data.get('landmarks', [])
                 )
+                
+                # Save cropped face image
+                try:
+                    img = Image.open(image_path)
+                    x, y, w, h = bbox
+                    # Add padding
+                    padding = 20
+                    x1 = max(0, int(x - padding))
+                    y1 = max(0, int(y - padding))
+                    x2 = min(img.width, int(x + w + padding))
+                    y2 = min(img.height, int(y + h + padding))
+                    
+                    face_img = img.crop((x1, y1, x2, y2))
+                    
+                    # Save to BytesIO
+                    buffer = io.BytesIO()
+                    face_img.save(buffer, format='JPEG', quality=95)
+                    buffer.seek(0)
+                    
+                    # Generate filename
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                    filename = f'face_{timestamp}.jpg'
+                    
+                    detection_obj.frame_image.save(
+                        filename,
+                        ContentFile(buffer.read()),
+                        save=False
+                    )
+                except Exception as e:
+                    logger.error(f"Error saving face image: {e}")
+                
+                detection_obj.save()
+                
+                # Send email alert for unknown persons
+                if not detection_data.get('is_match', False) and camera.organization:
+                    try:
+                        from .emails import send_unknown_person_alert
+                        send_unknown_person_alert(detection_obj, camera.organization)
+                        logger.info(f"Email alert sent for unknown person detection {detection_obj.id}")
+                    except Exception as e:
+                        logger.error(f"Failed to send email alert: {e}")
+                
+                # Create AccessLog if camera is linked to an AccessPoint
+                try:
+                    if camera.access_point:
+                        matched = bool(detection_data.get('is_match', False))
+                        user_obj = None
+                        # Best-effort user resolution from FaceIdentity.person_meta
+                        if detection_obj.identity and detection_data.get('person_meta'):
+                            meta = detection_data.get('person_meta') or {}
+                            User = get_user_model()
+                            for key in ['user_id', 'id']:
+                                uid = meta.get(key)
+                                if uid:
+                                    try:
+                                        user_obj = User.objects.get(id=uid)
+                                        break
+                                    except Exception:
+                                        pass
+                            if not user_obj:
+                                for key in ['username', 'email']:
+                                    val = meta.get(key)
+                                    if val:
+                                        try:
+                                            lookup = {key: val}
+                                            user_obj = User.objects.get(**lookup)
+                                            break
+                                        except Exception:
+                                            pass
+                        AccessLog.objects.create(
+                            organization=camera.organization,
+                            access_point=camera.access_point,
+                            user=user_obj,
+                            event_type='entry',
+                            is_granted=matched,
+                            denial_reason='' if matched else 'no_permission',
+                            timestamp=timezone.now(),
+                            direction='in',
+                            photo_url=detection_obj.frame_image.url if detection_obj.frame_image else '',
+                            device_info={'camera': camera.name}
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to create AccessLog from detection {detection_obj.id}: {e}")
         
         logger.info(f"Processed {len(detections)} faces from image")
         return detections

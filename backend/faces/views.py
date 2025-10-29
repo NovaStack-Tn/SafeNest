@@ -3,11 +3,14 @@ API views for face recognition.
 """
 import os
 import tempfile
+import logging
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+
+logger = logging.getLogger(__name__)
 from .models import Camera, FaceIdentity, FaceEmbedding, FaceDetection
 from .serializers import (
     CameraSerializer, FaceIdentitySerializer, FaceIdentityDetailSerializer,
@@ -187,11 +190,31 @@ class FaceDetectionViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['post'])
     def detect(self, request):
         """Detect faces in uploaded image."""
+        from .models import Camera
+        
         serializer = DetectFaceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
         image = serializer.validated_data['image']
         camera_id = serializer.validated_data.get('camera_id')
+        
+        # Get or create a default "Live Surveillance" camera for this user's organization
+        camera = None
+        if request.user.organization:
+            camera, created = Camera.objects.get_or_create(
+                organization=request.user.organization,
+                name='Live Surveillance Camera',
+                defaults={
+                    'location': 'Web Browser',
+                    'description': 'Live camera surveillance from web interface',
+                    'active': True,
+                    'detection_interval': 3,
+                    'confidence_threshold': 0.6
+                }
+            )
+            camera_id = camera.id
+            if created:
+                logger.info(f"Created default Live Surveillance camera for org {request.user.organization.id}")
         
         # Save image temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
@@ -201,11 +224,12 @@ class FaceDetectionViewSet(viewsets.ReadOnlyModelViewSet):
         
         try:
             # Run detection with organization for face recognition
+            # Always create detection records
             detections = detect_faces_in_image(
                 temp_path,
                 camera_id=camera_id,
                 organization_id=request.user.organization.id if request.user.organization else None,
-                create_detection=camera_id is not None
+                create_detection=True  # Always save detections
             )
             
             return Response({
@@ -221,17 +245,36 @@ class FaceDetectionViewSet(viewsets.ReadOnlyModelViewSet):
     def statistics(self, request):
         """Get detection statistics."""
         queryset = self.get_queryset()
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        today = timezone.now().date()
         
         stats = {
             'total': queryset.count(),
             'matched': queryset.filter(is_match=True).count(),
             'unmatched': queryset.filter(is_match=False).count(),
-            'today': queryset.filter(
-                timestamp__date=request.user.organization.created_at.date() if request.user.organization else None
-            ).count() if request.user.organization else 0,
+            'today': queryset.filter(timestamp__date=today).count(),
+            'last_24h': queryset.filter(timestamp__gte=timezone.now() - timedelta(hours=24)).count(),
         }
         
         return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """Get recent detections for live monitoring."""
+        limit = int(request.query_params.get('limit', 50))
+        queryset = self.get_queryset()[:limit]
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def alerts(self, request):
+        """Get unmatched face alerts (suspected/unknown faces)."""
+        limit = int(request.query_params.get('limit', 20))
+        queryset = self.get_queryset().filter(is_match=False)[:limit]
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FaceAPIView(viewsets.ViewSet):

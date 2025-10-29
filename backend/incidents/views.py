@@ -7,11 +7,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from .models import Incident, IncidentEvent, Evidence
+from .models import Incident, IncidentEvent, Evidence, IncidentCategory, IncidentResolution
 from .serializers import (
     IncidentSerializer, IncidentDetailSerializer, IncidentCreateSerializer,
-    IncidentEventSerializer, EvidenceSerializer
+    IncidentEventSerializer, EvidenceSerializer, IncidentCategorySerializer,
+    IncidentResolutionSerializer, AutoIncidentCreateSerializer
 )
+from .ai_service import IncidentAIService
 
 
 class IncidentViewSet(viewsets.ModelViewSet):
@@ -165,7 +167,8 @@ class IncidentViewSet(viewsets.ModelViewSet):
                 'high': queryset.filter(severity='high').count(),
                 'critical': queryset.filter(severity='critical').count(),
             },
-            'by_type': {}
+            'by_type': {},
+            'ai_generated': queryset.filter(ai_generated=True).count(),
         }
         
         # Count by type
@@ -174,6 +177,75 @@ class IncidentViewSet(viewsets.ModelViewSet):
             stats['by_type'][type_key] = queryset.filter(incident_type=type_key).count()
         
         return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def ai_classify(self, request, pk=None):
+        """Use AI to classify incident severity and extract entities."""
+        incident = self.get_object()
+        
+        # Classify severity
+        severity, confidence = IncidentAIService.classify_severity(
+            incident.title, 
+            incident.description
+        )
+        
+        # Extract entities
+        entities = IncidentAIService.extract_entities(incident.description)
+        
+        # Update incident
+        incident.severity = severity
+        incident.ai_confidence = confidence
+        incident.extracted_entities = entities
+        incident.save()
+        
+        return Response({
+            'severity': severity,
+            'confidence': confidence,
+            'extracted_entities': entities,
+            'message': 'AI classification completed'
+        })
+    
+    @action(detail=True, methods=['get'])
+    def ai_summary(self, request, pk=None):
+        """Generate AI summary of the incident."""
+        incident = self.get_object()
+        summary = IncidentAIService.generate_summary(incident)
+        
+        return Response({
+            'summary': summary
+        })
+    
+    @action(detail=True, methods=['get'])
+    def ai_actions(self, request, pk=None):
+        """Get AI-recommended next actions for the incident."""
+        incident = self.get_object()
+        actions = IncidentAIService.recommend_actions(incident)
+        
+        return Response({
+            'actions': actions
+        })
+    
+    @action(detail=False, methods=['post'])
+    def auto_create(self, request):
+        """Auto-create incident from alert using AI."""
+        serializer = AutoIncidentCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            incident = serializer.save()
+            
+            # Create initial event
+            IncidentEvent.objects.create(
+                incident=incident,
+                action='created',
+                description=f"Auto-generated incident from alert",
+                actor=None,
+                metadata={'auto_generated': True}
+            )
+            
+            return Response(
+                IncidentSerializer(incident, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class IncidentEventViewSet(viewsets.ReadOnlyModelViewSet):
@@ -214,4 +286,64 @@ class EvidenceViewSet(viewsets.ModelViewSet):
             description=f"Evidence added: {evidence.file_name}",
             actor=self.request.user,
             metadata={'evidence_id': evidence.id}
+        )
+
+
+class IncidentCategoryViewSet(viewsets.ModelViewSet):
+    """API endpoint for incident categories."""
+    queryset = IncidentCategory.objects.all()
+    serializer_class = IncidentCategorySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['organization', 'is_active']
+    search_fields = ['name', 'description']
+    
+    def get_queryset(self):
+        """Filter by organization for non-admin users."""
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        if not user.is_staff and user.organization:
+            queryset = queryset.filter(organization=user.organization)
+        
+        return queryset
+
+
+class IncidentResolutionViewSet(viewsets.ModelViewSet):
+    """API endpoint for incident resolutions."""
+    queryset = IncidentResolution.objects.select_related(
+        'incident', 'resolved_by'
+    ).prefetch_related('related_incidents')
+    serializer_class = IncidentResolutionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['incident', 'resolution_type']
+    
+    def get_queryset(self):
+        """Filter by organization for non-admin users."""
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        if not user.is_staff and user.organization:
+            queryset = queryset.filter(incident__organization=user.organization)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Set resolved_by and automatically close incident."""
+        resolution = serializer.save(resolved_by=self.request.user)
+        
+        # Automatically close incident when resolution is added
+        incident = resolution.incident
+        incident.status = 'closed'
+        incident.closed_at = timezone.now()
+        incident.save()
+        
+        # Create incident event
+        IncidentEvent.objects.create(
+            incident=incident,
+            action='closed',
+            description=f"Incident closed with resolution: {resolution.resolution_type}",
+            actor=self.request.user,
+            metadata={'resolution_id': resolution.id}
         )
