@@ -17,7 +17,7 @@ class SafeNestTools:
         self.organization_id = organization_id
         self.user_id = user_id
     
-    def search_logs(self, query: str, time_range: str = '24h', event_type: str = 'all') -> dict:
+    def search_logs(self, query: str = '', time_range: str = '24h', event_type: str = 'all') -> dict:
         """Search login events, alerts, and incidents."""
         from security.models import LoginEvent, Alert
         from incidents.models import Incident
@@ -41,13 +41,17 @@ class SafeNestTools:
                 events = LoginEvent.objects.filter(
                     user__organization_id=self.organization_id,
                     timestamp__gte=since
-                ).filter(
-                    username__icontains=query
-                ) | LoginEvent.objects.filter(
-                    user__organization_id=self.organization_id,
-                    timestamp__gte=since,
-                    country_name__icontains=query
                 )
+                
+                # Apply query filter only if query is provided
+                if query:
+                    events = events.filter(
+                        username__icontains=query
+                    ) | LoginEvent.objects.filter(
+                        user__organization_id=self.organization_id,
+                        timestamp__gte=since,
+                        country_name__icontains=query
+                    )
                 
                 results['login_events'] = [
                     {
@@ -66,13 +70,18 @@ class SafeNestTools:
             if event_type in ['alert', 'all']:
                 alerts = Alert.objects.filter(
                     organization_id=self.organization_id,
-                    created_at__gte=since,
-                    title__icontains=query
-                ) | Alert.objects.filter(
-                    organization_id=self.organization_id,
-                    created_at__gte=since,
-                    message__icontains=query
+                    created_at__gte=since
                 )
+                
+                # Apply query filter only if query is provided
+                if query:
+                    alerts = alerts.filter(
+                        title__icontains=query
+                    ) | Alert.objects.filter(
+                        organization_id=self.organization_id,
+                        created_at__gte=since,
+                        message__icontains=query
+                    )
                 
                 results['alerts'] = [
                     {
@@ -89,13 +98,18 @@ class SafeNestTools:
             if event_type in ['incident', 'all']:
                 incidents = Incident.objects.filter(
                     organization_id=self.organization_id,
-                    opened_at__gte=since,
-                    title__icontains=query
-                ) | Incident.objects.filter(
-                    organization_id=self.organization_id,
-                    opened_at__gte=since,
-                    description__icontains=query
+                    opened_at__gte=since
                 )
+                
+                # Apply query filter only if query is provided
+                if query:
+                    incidents = incidents.filter(
+                        title__icontains=query
+                    ) | Incident.objects.filter(
+                        organization_id=self.organization_id,
+                        opened_at__gte=since,
+                        description__icontains=query
+                    )
                 
                 results['incidents'] = [
                     {
