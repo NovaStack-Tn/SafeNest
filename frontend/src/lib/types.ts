@@ -60,37 +60,92 @@ export interface Alert {
 }
 
 // Incident Types
+export interface IncidentCategory {
+  id: number;
+  organization: number;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  severity_default: 'low' | 'medium' | 'high' | 'critical';
+  is_active: boolean;
+  created_at: string;
+  incident_count: number;
+}
+
 export interface Incident {
   id: number;
   title: string;
   description: string;
   incident_type: string;
+  category?: number;
+  category_name?: string;
+  category_color?: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'investigating' | 'contained' | 'resolved' | 'closed';
   assignee?: number;
   assignee_name?: string;
+  created_by?: number;
   created_by_name?: string;
+  organization: number;
   opened_at: string;
   closed_at?: string;
+  updated_at: string;
   event_count: number;
   evidence_count: number;
+  tags: string[];
+  metadata: Record<string, any>;
+  ai_generated: boolean;
+  ai_confidence?: number;
+  extracted_entities?: Record<string, any>;
+  has_resolution: boolean;
+  events?: IncidentEvent[];
+  evidence?: Evidence[];
+  resolution?: IncidentResolution;
 }
 
 export interface IncidentEvent {
   id: number;
+  incident: number;
   action: string;
   description: string;
+  actor?: number;
   actor_name?: string;
+  metadata: Record<string, any>;
   timestamp: string;
 }
 
 export interface Evidence {
   id: number;
+  incident: number;
+  file: string;
   file_name: string;
   file_url?: string;
-  kind: string;
+  file_size: number;
+  file_hash: string;
+  kind: 'frame' | 'image' | 'log' | 'document' | 'other';
+  description: string;
+  uploaded_by?: number;
   uploaded_by_name?: string;
   uploaded_at: string;
+  metadata: Record<string, any>;
+}
+
+export interface IncidentResolution {
+  id: number;
+  incident: number;
+  resolution_type: 'resolved' | 'false_positive' | 'duplicate' | 'mitigated' | 'escalated' | 'cannot_fix';
+  summary: string;
+  actions_taken: string;
+  root_cause: string;
+  preventive_measures: string;
+  related_incidents: number[];
+  resolved_by?: number;
+  resolved_by_name?: string;
+  resolved_at: string;
+  time_to_detect?: string;
+  time_to_resolve?: string;
+  metadata: Record<string, any>;
 }
 
 // Face Recognition Types

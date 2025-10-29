@@ -8,6 +8,40 @@ from django.utils.translation import gettext_lazy as _
 User = get_user_model()
 
 
+class IncidentCategory(models.Model):
+    """Configurable incident categories (theft, violence, breach, etc.)."""
+    organization = models.ForeignKey(
+        'core.Organization',
+        on_delete=models.CASCADE,
+        related_name='incident_categories'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=7, default='#6b7280')  # Hex color
+    icon = models.CharField(max_length=50, blank=True)  # Icon name
+    severity_default = models.CharField(
+        max_length=10,
+        choices=[
+            ('low', 'Low'),
+            ('medium', 'Medium'),
+            ('high', 'High'),
+            ('critical', 'Critical'),
+        ],
+        default='medium'
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['name']
+        unique_together = ['organization', 'name']
+        verbose_name = _('Incident Category')
+        verbose_name_plural = _('Incident Categories')
+    
+    def __str__(self):
+        return self.name
+
+
 class Incident(models.Model):
     """Security incident with workflow."""
     TYPE_CHOICES = [
@@ -42,8 +76,20 @@ class Incident(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     incident_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
+    category = models.ForeignKey(
+        IncidentCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incidents'
+    )
     severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    
+    # AI-generated fields
+    ai_generated = models.BooleanField(default=False)
+    ai_confidence = models.FloatField(null=True, blank=True)  # Confidence score for AI classification
+    extracted_entities = models.JSONField(default=dict, blank=True)  # NLP extracted entities
     
     # Assignment
     assignee = models.ForeignKey(
@@ -158,3 +204,55 @@ class Evidence(models.Model):
     
     def __str__(self):
         return f"{self.file_name} - {self.incident.title}"
+
+
+class IncidentResolution(models.Model):
+    """Resolution details for closed incidents."""
+    RESOLUTION_TYPE_CHOICES = [
+        ('resolved', 'Resolved'),
+        ('false_positive', 'False Positive'),
+        ('duplicate', 'Duplicate'),
+        ('mitigated', 'Mitigated'),
+        ('escalated', 'Escalated'),
+        ('cannot_fix', 'Cannot Fix'),
+    ]
+    
+    incident = models.OneToOneField(
+        Incident,
+        on_delete=models.CASCADE,
+        related_name='resolution'
+    )
+    resolution_type = models.CharField(max_length=20, choices=RESOLUTION_TYPE_CHOICES)
+    summary = models.TextField()  # What happened
+    actions_taken = models.TextField()  # What was done
+    root_cause = models.TextField(blank=True)  # Why it happened
+    preventive_measures = models.TextField(blank=True)  # Future prevention
+    
+    # References
+    related_incidents = models.ManyToManyField(
+        Incident,
+        blank=True,
+        related_name='related_resolutions'
+    )
+    
+    resolved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='resolved_incidents'
+    )
+    resolved_at = models.DateTimeField(auto_now_add=True)
+    
+    # Time tracking
+    time_to_detect = models.DurationField(null=True, blank=True)  # Time from occurrence to detection
+    time_to_resolve = models.DurationField(null=True, blank=True)  # Time from detection to resolution
+    
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        ordering = ['-resolved_at']
+        verbose_name = _('Incident Resolution')
+        verbose_name_plural = _('Incident Resolutions')
+    
+    def __str__(self):
+        return f"Resolution for {self.incident.title}"

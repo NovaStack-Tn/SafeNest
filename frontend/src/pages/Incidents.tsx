@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, AlertTriangle, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { IncidentCard } from '@/components/IncidentCard';
 import { CreateIncidentModal } from '@/components/CreateIncidentModal';
+import { IncidentDetailModal } from '@/components/IncidentDetailModal';
 import { Card } from '@/components/Card';
 import { Loader } from '@/components/Loader';
 import { Button } from '@/components/Button';
@@ -24,7 +25,7 @@ export const Incidents = () => {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  // const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null); // TODO: For detail modal
+  const [selectedIncidentId, setSelectedIncidentId] = useState<number | null>(null);
 
   // Fetch incidents
   const { data: incidents, isLoading, error } = useQuery<Incident[]>({
@@ -215,10 +216,7 @@ export const Incidents = () => {
                           <IncidentCard
                             key={incident.id}
                             incident={incident}
-                            onClick={() => {
-                              // TODO: Open incident detail modal
-                              toast(`Incident #${incident.id}: ${incident.title}`, { icon: '📋' });
-                            }}
+                            onClick={() => setSelectedIncidentId(incident.id)}
                           />
                         ))
                       ) : (
@@ -242,6 +240,15 @@ export const Incidents = () => {
         onSubmit={(data) => createMutation.mutate(data)}
         loading={createMutation.isPending}
       />
+
+      {/* Incident Detail Modal */}
+      {selectedIncidentId && (
+        <IncidentDetailModal
+          isOpen={!!selectedIncidentId}
+          onClose={() => setSelectedIncidentId(null)}
+          incidentId={selectedIncidentId}
+        />
+      )}
     </div>
   );
 };
