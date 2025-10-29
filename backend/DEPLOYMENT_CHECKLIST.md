@@ -31,6 +31,7 @@ Navigate to: Dashboard → safenest-backend → Environment
 ### Required Variables
 - [ ] `ALLOWED_HOSTS` = `your-app-name.onrender.com`
 - [ ] `GEMINI_API_KEY` = `your-gemini-api-key`
+- [ ] `DJANGO_SUPERUSER_PASSWORD` = `your-admin-password`
 
 ### Recommended Variables
 - [ ] `CORS_ALLOWED_ORIGINS` = `https://your-frontend-url.com`
@@ -51,11 +52,10 @@ Navigate to: Dashboard → safenest-backend → Environment
   \q
   ```
 
-- [ ] **Create Superuser**
-  ```bash
-  # In Render: safenest-backend → Shell
-  python manage.py createsuperuser
-  ```
+- [ ] **Superuser Created Automatically**
+  - Username: `admin`
+  - Email: `admin@safenest.com`
+  - Password: Set via `DJANGO_SUPERUSER_PASSWORD` env var
 
 - [ ] **Test Endpoints**
   - [ ] `https://your-app.onrender.com/api/health/`

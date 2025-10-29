@@ -165,11 +165,19 @@ For scheduled tasks:
 
 ### 1. Create Superuser
 
-Connect to your web service shell:
-```bash
-# In Render Dashboard → safenest-backend → Shell
-python manage.py createsuperuser
-```
+Superuser is created automatically during deployment! Just set the password in Render Dashboard:
+
+**Go to**: Dashboard → `safenest-backend` → Environment
+
+**Set this variable**:
+- `DJANGO_SUPERUSER_PASSWORD` = `your-secure-password`
+
+The superuser will be created with:
+- **Username**: `admin`
+- **Email**: `admin@safenest.com`
+- **Password**: Whatever you set in `DJANGO_SUPERUSER_PASSWORD`
+
+> **Note**: On free plan, shell access is disabled. The build script automatically creates the superuser using environment variables.
 
 ### 2. Verify Deployment
 
