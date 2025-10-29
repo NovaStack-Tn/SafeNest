@@ -85,16 +85,29 @@ WSGI_APPLICATION = 'safenest.wsgi.application'
 ASGI_APPLICATION = 'safenest.asgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'safenest'),
-        'USER': os.environ.get('POSTGRES_USER', 'safenest'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'safenest'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+# Support both PostgreSQL (Docker) and SQLite (Local)
+DATABASE_ENGINE = os.environ.get('DATABASE_ENGINE', 'django.db.backends.postgresql')
+
+if DATABASE_ENGINE == 'django.db.backends.sqlite3':
+    # SQLite for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / os.environ.get('DATABASE_NAME', 'db.sqlite3'),
+        }
     }
-}
+else:
+    # PostgreSQL for Docker
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'safenest'),
+            'USER': os.environ.get('POSTGRES_USER', 'safenest'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'safenest'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -189,9 +202,9 @@ MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', 'minioadmin')
 MINIO_SECURE = os.environ.get('MINIO_SECURE', 'False') == 'True'
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'safenest')
 
-# OpenAI Configuration
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4-turbo-preview')
+# Google Gemini Configuration
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-1.5-flash')
 
 # InsightFace Configuration
 INSIGHTFACE_MODEL_NAME = os.environ.get('INSIGHTFACE_MODEL_NAME', 'buffalo_l')

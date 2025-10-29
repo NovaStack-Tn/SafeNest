@@ -1,6 +1,7 @@
 """
 Intelligent Alert Aggregation Service
 De-duplicates similar alerts, correlates related alerts, and reduces alert fatigue
+Uses centralized LLM for intelligent correlation
 """
 from datetime import timedelta
 from django.utils import timezone
@@ -9,13 +10,14 @@ from difflib import SequenceMatcher
 import logging
 
 from ..models import Alert, Threat
+from llm.services import LLMService
 
 logger = logging.getLogger(__name__)
 
 
 class AlertAggregationService:
     """
-    Smart alert aggregation to reduce alert fatigue
+    Smart alert aggregation to reduce alert fatigue with LLM-powered intelligence
     """
     
     def __init__(self, similarity_threshold=0.8):
@@ -26,6 +28,7 @@ class AlertAggregationService:
             similarity_threshold: Minimum similarity to consider alerts as duplicates (0-1)
         """
         self.similarity_threshold = similarity_threshold
+        self.llm = LLMService()  # ✅ Use centralized LLM service
     
     def deduplicate_alerts(self, organization_id, time_window_minutes=60, max_alerts=100):
         """
@@ -508,3 +511,85 @@ class AlertAggregationService:
             return True
         
         return False
+    
+    def run_full_aggregation(self, organization_id):
+        """
+        Run complete aggregation pipeline with LLM-enhanced analysis
+        
+        Returns:
+            dict: Complete aggregation results
+        """
+        try:
+            results = {
+                'status': 'success',
+                'timestamp': timezone.now().isoformat(),
+                'organization_id': organization_id
+            }
+            
+            # Step 1: Deduplicate
+            dedup_results = self.deduplicate_alerts(organization_id)
+            results['deduplication'] = dedup_results
+            
+            # Step 2: Correlate
+            corr_results = self.correlate_alerts_to_incidents(organization_id)
+            results['correlation'] = corr_results
+            
+            # Step 3: Smart filter
+            filter_results = self.apply_smart_filtering(organization_id)
+            results['filtering'] = filter_results
+            
+            # Step 4: Route critical
+            route_results = self.route_alerts_by_priority(organization_id)
+            results['routing'] = route_results
+            
+            # Step 5: Generate summary with LLM
+            summary = self.generate_alert_summary(organization_id)
+            results['summary'] = summary
+            
+            # Step 6: LLM Analysis
+            llm_analysis = self._generate_llm_insights(summary)
+            results['llm_insights'] = llm_analysis
+            
+            return results
+        
+        except Exception as e:
+            logger.error(f"Error running full aggregation: {str(e)}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def _generate_llm_insights(self, summary):
+        """Use LLM to generate intelligent insights from alert summary"""
+        try:
+            if summary.get('status') != 'success':
+                return {'insights': 'Unable to generate insights'}
+            
+            context = f"""Alert Summary Analysis (Last {summary.get('period_hours', 24)} hours):
+
+Total Alerts: {summary.get('total_alerts', 0)}
+By Severity: {summary.get('by_severity', {})}
+By Type: {summary.get('by_type', {})}
+Resolution Rate: {summary.get('metrics', {}).get('resolution_rate', 0)}%
+False Positive Rate: {summary.get('metrics', {}).get('false_positive_rate', 0)}%
+
+As a security analyst, provide:
+1. Key security concerns (2-3 bullet points)
+2. Recommended immediate actions
+3. Pattern analysis
+4. Risk assessment
+
+Be concise and actionable."""
+
+            messages = [
+                {'role': 'system', 'content': 'You are a senior security analyst providing actionable insights.'},
+                {'role': 'user', 'content': context}
+            ]
+            
+            response = self.llm.chat_completion(messages, temperature=0.3, max_tokens=400)
+            
+            return {
+                'insights': response.get('content', ''),
+                'generated_at': timezone.now().isoformat()
+            }
+        
+        except Exception as e:
+            logger.warning(f"LLM insights generation failed: {e}")
+            return {'insights': 'LLM analysis unavailable', 'error': str(e)}

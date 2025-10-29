@@ -48,6 +48,7 @@ from .services import (
     AlertAggregationService,
     ThreatHuntingAssistant
 )
+from .services.threat_ai_analysis import ThreatAIAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,47 @@ class ThreatViewSet(viewsets.ModelViewSet):
                 stats['by_type'][threat_type] = count
         
         return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def ai_analyze(self, request, pk=None):
+        """Get AI-powered analysis for a specific threat"""
+        threat = self.get_object()
+        
+        ai_service = ThreatAIAnalysisService()
+        analysis = ai_service.analyze_threat(threat)
+        
+        return Response(analysis)
+    
+    @action(detail=True, methods=['post'])
+    def ai_action_plan(self, request, pk=None):
+        """Generate AI-powered action plan for a threat"""
+        threat = self.get_object()
+        
+        ai_service = ThreatAIAnalysisService()
+        action_plan = ai_service.generate_action_plan(threat)
+        
+        return Response(action_plan)
+    
+    @action(detail=True, methods=['post'])
+    def ai_mitigation(self, request, pk=None):
+        """Get AI-powered mitigation suggestions for a threat"""
+        threat = self.get_object()
+        
+        ai_service = ThreatAIAnalysisService()
+        mitigation = ai_service.suggest_mitigation(threat)
+        
+        return Response(mitigation)
+    
+    @action(detail=False, methods=['post'])
+    def ai_bulk_analyze(self, request):
+        """Analyze multiple threats with AI"""
+        limit = int(request.data.get('limit', 10))
+        
+        queryset = self.get_queryset()
+        ai_service = ThreatAIAnalysisService()
+        results = ai_service.bulk_analyze_threats(queryset, limit=limit)
+        
+        return Response(results)
 
 
 class AlertViewSet(viewsets.ModelViewSet):
@@ -676,6 +718,29 @@ class AlertAggregationViewSet(viewsets.ViewSet):
         result = service.apply_smart_filtering(
             organization_id=request.user.organization.id,
             confidence_threshold=confidence_threshold
+        )
+        
+        return Response(result)
+    
+    @action(detail=False, methods=['post'])
+    def run_full_aggregation(self, request):
+        """Run complete aggregation pipeline with LLM insights"""
+        service = AlertAggregationService()
+        result = service.run_full_aggregation(
+            organization_id=request.user.organization.id
+        )
+        
+        return Response(result)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get alert summary"""
+        time_range_hours = int(request.query_params.get('time_range_hours', 24))
+        
+        service = AlertAggregationService()
+        result = service.generate_alert_summary(
+            organization_id=request.user.organization.id,
+            time_range_hours=time_range_hours
         )
         
         return Response(result)

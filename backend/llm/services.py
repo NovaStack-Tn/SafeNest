@@ -143,10 +143,25 @@ class LLMService:
             import traceback
             traceback.print_exc()
             return {
-                'content': f"Error: {str(e)}",
+                'content': f"Unable to generate response. Please try again.",
                 'role': 'assistant',
                 'tool_calls': []
             }
+    
+    def _convert_messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
+        """Convert OpenAI-style messages to single prompt for Gemini"""
+        prompt_parts = []
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            if role == 'system':
+                prompt_parts.append(f"Instructions: {content}\n")
+            elif role == 'user':
+                prompt_parts.append(f"User: {content}\n")
+            elif role == 'assistant':
+                prompt_parts.append(f"Assistant: {content}\n")
+        
+        return "\n".join(prompt_parts)
     
     def create_embedding(self, text: str) -> List[float]:
         """

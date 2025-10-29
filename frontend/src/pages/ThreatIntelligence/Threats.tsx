@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Target, AlertTriangle, TrendingUp, Shield, Search, Filter, X } from 'lucide-react';
+import { Plus, Target, AlertTriangle, TrendingUp, Shield, Search, Filter, X, Edit, Trash2, Sparkles } from 'lucide-react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Loader } from '@/components/Loader';
@@ -44,6 +44,8 @@ export const Threats = () => {
   const [severityFilter, setSeverityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingThreat, setEditingThreat] = useState<Threat | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{threatId: number; analysis: string} | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -89,14 +91,106 @@ export const Threats = () => {
     },
   });
 
+  // Update threat mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await api.patch(`/threat-intelligence/threats/${id}/`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['threats'] });
+      setEditingThreat(null);
+      setFormData({
+        title: '',
+        description: '',
+        threat_type: 'malware',
+        severity: 'medium',
+        source: 'manual',
+      });
+      toast.success('Threat updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to update threat');
+    },
+  });
+
+  // Delete threat mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.delete(`/threat-intelligence/threats/${id}/`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['threats'] });
+      toast.success('Threat deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to delete threat');
+    },
+  });
+
+  // AI Analysis mutation
+  const aiAnalyzeMutation = useMutation({
+    mutationFn: async (threatId: number) => {
+      const response = await api.post(`/threat-intelligence/threats/${threatId}/ai_analyze/`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setAiAnalysis({ threatId: data.threat_id, analysis: data.analysis });
+      toast.success('AI analysis completed');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to analyze threat');
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    if (editingThreat) {
+      updateMutation.mutate({ id: editingThreat.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleEdit = (threat: Threat) => {
+    setEditingThreat(threat);
+    setFormData({
+      title: threat.title,
+      description: threat.description,
+      threat_type: threat.threat_type,
+      severity: threat.severity,
+      source: 'manual',
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Are you sure you want to delete this threat?')) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const handleAIAnalyze = (threat: Threat) => {
+    aiAnalyzeMutation.mutate(threat.id);
+  };
+
+  const handleCloseModal = () => {
+    setIsCreateModalOpen(false);
+    setEditingThreat(null);
+    setFormData({
+      title: '',
+      description: '',
+      threat_type: 'malware',
+      severity: 'medium',
+      source: 'manual',
+    });
   };
 
   const filteredThreats = threats?.filter((threat) => {
-    const matchesSearch = threat.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         threat.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      (threat.title?.toLowerCase() || '').includes(searchLower) ||
+      (threat.description?.toLowerCase() || '').includes(searchLower);
     const matchesSeverity = severityFilter === 'all' || threat.severity === severityFilter;
     const matchesStatus = statusFilter === 'all' || threat.status === statusFilter;
     return matchesSearch && matchesSeverity && matchesStatus;
@@ -258,26 +352,60 @@ export const Threats = () => {
                     <span>Confidence: {(threat.confidence_score * 100).toFixed(0)}%</span>
                   </div>
                 </div>
-                <Button variant="secondary" size="sm">
-                  View Details
-                </Button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAIAnalyze(threat)}
+                    disabled={aiAnalyzeMutation.isPending}
+                    className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900 rounded-lg transition-colors disabled:opacity-50"
+                    title="AI Analysis"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleEdit(threat)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                    title="Edit threat"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(threat.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors"
+                    title="Delete threat"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
+              
+              {/* AI Analysis Display */}
+              {aiAnalysis && aiAnalysis.threatId === threat.id && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-5 h-5 text-purple-600" />
+                    <h4 className="font-semibold text-gray-900 dark:text-white">AI Analysis</h4>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                    {aiAnalysis.analysis}
+                  </p>
+                </div>
+              )}
             </Card>
           ))
         )}
       </div>
 
-      {/* Create Threat Modal */}
-      {isCreateModalOpen && (
+      {/* Create/Edit Threat Modal */}
+      {(isCreateModalOpen || editingThreat) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Create New Threat
+                  {editingThreat ? 'Edit Threat' : 'Create New Threat'}
                 </h2>
                 <button
-                  onClick={() => setIsCreateModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   <X className="w-6 h-6" />
@@ -372,15 +500,17 @@ export const Threats = () => {
                 <div className="flex gap-3 pt-4">
                   <Button
                     type="submit"
-                    disabled={createMutation.isPending}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="flex-1"
                   >
-                    {createMutation.isPending ? 'Creating...' : 'Create Threat'}
+                    {createMutation.isPending || updateMutation.isPending
+                      ? (editingThreat ? 'Updating...' : 'Creating...')
+                      : (editingThreat ? 'Update Threat' : 'Create Threat')}
                   </Button>
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => setIsCreateModalOpen(false)}
+                    onClick={handleCloseModal}
                     className="flex-1"
                   >
                     Cancel

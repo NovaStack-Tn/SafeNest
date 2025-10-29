@@ -1,11 +1,14 @@
 """
-Threat Hunting Assistant with LLM-powered natural language queries
+Threat Hunting Assistant Service
+AI-powered natural language threat hunting with centralized LLM integration
 """
-import json
-from datetime import timedelta
+from typing import Dict, List, Any
+from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db.models import Q, Count
+from llm.services import LLMService
 import logging
+import re
 
 from ..models import Threat, Alert, ThreatHuntingQuery, ThreatIndicator
 from access_control.models import AccessLog
@@ -20,6 +23,7 @@ class ThreatHuntingAssistant:
     """
     
     def __init__(self):
+        self.llm = LLMService()  # Use centralized LLM service
         self.supported_queries = [
             'failed_logins',
             'unusual_access',
@@ -178,6 +182,37 @@ class ThreatHuntingAssistant:
                     'priority': 'medium'
                 })
             
+            # Use LLM to enhance hypotheses with intelligent analysis
+            if hypotheses:
+                context = f"""Recent security data analysis (last {time_range_days} days):
+- Anomalous access events: {anomalous_access}
+- Off-hours logins: {off_hours_logins}
+- Total threats: {threats.count()}
+- Recent threat indicators: {recent_indicators}
+
+Based on these statistics and the following hypotheses, provide additional insights or refined hypotheses:
+{[h['hypothesis'] for h in hypotheses]}
+
+Suggest 1-2 additional high-value threat hunting hypotheses that might be overlooked."""
+
+                messages = [
+                    {'role': 'system', 'content': 'You are a senior threat hunter analyzing security data.'},
+                    {'role': 'user', 'content': context}
+                ]
+                
+                try:
+                    response = self.llm.chat_completion(messages, temperature=0.7, max_tokens=500)
+                    if response['content']:
+                        hypotheses.append({
+                            'hypothesis': 'AI-Enhanced Analysis',
+                            'suggested_query': 'Review all suspicious patterns',
+                            'rationale': response['content'],
+                            'priority': 'medium',
+                            'ai_generated': True
+                        })
+                except Exception as e:
+                    logger.warning(f"LLM enhancement failed: {e}")
+            
             return {
                 'status': 'success',
                 'period_days': time_range_days,
@@ -291,23 +326,52 @@ class ThreatHuntingAssistant:
     
     # Helper methods for query parsing
     def _parse_query_intent(self, query_text):
-        """Parse natural language query to determine intent"""
-        query_lower = query_text.lower()
+        """Parse natural language query to determine intent using LLM"""
+        prompt = f"""Analyze this threat hunting query and classify it into one of these categories:
+- failed_logins: queries about failed login attempts
+- unusual_access: queries about anomalous or unusual access patterns
+- threats_by_location: queries about threats in specific locations
+- suspicious_users: queries about suspicious users or persons
+- recent_incidents: queries about recent or new incidents
+- access_patterns: queries about behavior patterns or activity
+- generic: anything else
+
+Query: "{query_text}"
+
+Respond with ONLY the category name, nothing else."""
+
+        messages = [
+            {'role': 'system', 'content': 'You are a threat intelligence analyst classifying queries.'},
+            {'role': 'user', 'content': prompt}
+        ]
         
-        if any(word in query_lower for word in ['failed', 'login', 'authentication']):
-            return 'failed_logins'
-        elif any(word in query_lower for word in ['unusual', 'anomalous', 'strange']):
-            return 'unusual_access'
-        elif any(word in query_lower for word in ['location', 'place', 'where']):
-            return 'threats_by_location'
-        elif any(word in query_lower for word in ['suspicious', 'user', 'person']):
-            return 'suspicious_users'
-        elif any(word in query_lower for word in ['recent', 'latest', 'new', 'incident']):
-            return 'recent_incidents'
-        elif any(word in query_lower for word in ['pattern', 'behavior', 'activity']):
-            return 'access_patterns'
-        else:
-            return 'generic'
+        try:
+            response = self.llm.chat_completion(messages, temperature=0.1, max_tokens=50)
+            intent = response['content'].strip().lower()
+            
+            # Validate intent
+            if intent in self.supported_queries:
+                return intent
+            else:
+                return 'generic'
+        except Exception as e:
+            logger.error(f"LLM intent parsing error: {e}")
+            # Fallback to simple keyword matching
+            query_lower = query_text.lower()
+            if 'failed' in query_lower or 'login' in query_lower:
+                return 'failed_logins'
+            elif 'unusual' in query_lower or 'anomalous' in query_lower:
+                return 'unusual_access'
+            elif 'location' in query_lower:
+                return 'threats_by_location'
+            elif 'suspicious' in query_lower or 'user' in query_lower:
+                return 'suspicious_users'
+            elif 'recent' in query_lower or 'incident' in query_lower:
+                return 'recent_incidents'
+            elif 'pattern' in query_lower:
+                return 'access_patterns'
+            else:
+                return 'generic'
     
     def _query_failed_logins(self, organization_id, query_text):
         """Query for failed login attempts"""
@@ -539,21 +603,44 @@ class ThreatHuntingAssistant:
         }
     
     def _generate_executive_summary(self, report):
-        """Generate executive summary"""
+        """Generate executive summary using LLM"""
         summary = report['summary']
         
-        text = f"During the past {report['period_days']} days, "
-        text += f"{summary['total_threats']} threats were detected, "
-        text += f"including {summary['critical_threats']} critical threats. "
+        context = f"""Security Report Data (Last {report['period_days']} days):
+- Total Threats: {summary['total_threats']}
+- Critical Threats: {summary['critical_threats']}
+- Resolved Threats: {summary['resolved_threats']}
+- Resolution Rate: {summary['resolution_rate']}%
+- Total Alerts: {summary['total_alerts']}
+- High Severity Alerts: {summary['high_severity_alerts']}
+- Failed Access Attempts: {summary['failed_access_attempts']}
+- Anomalous Activities: {summary['anomalous_activities']}
+
+Generate a concise executive summary (3-4 sentences) that:
+1. Highlights the current security posture
+2. Identifies key concerns
+3. Notes any positive trends
+4. Provides a clear assessment for leadership"""
+
+        messages = [
+            {'role': 'system', 'content': 'You are a security analyst creating executive briefings for C-level executives.'},
+            {'role': 'user', 'content': context}
+        ]
         
-        if summary['resolution_rate'] > 80:
-            text += "The organization has maintained a strong security posture "
-            text += f"with a {summary['resolution_rate']}% threat resolution rate."
-        else:
-            text += f"Threat resolution rate of {summary['resolution_rate']}% "
-            text += "indicates room for improvement in incident response."
-        
-        return text
+        try:
+            response = self.llm.chat_completion(messages, temperature=0.5, max_tokens=300)
+            return response['content'].strip()
+        except Exception as e:
+            logger.warning(f"LLM executive summary failed: {e}")
+            # Fallback to simple summary
+            text = f"During the past {report['period_days']} days, "
+            text += f"{summary['total_threats']} threats were detected, "
+            text += f"including {summary['critical_threats']} critical threats. "
+            if summary['resolution_rate'] > 80:
+                text += f"Strong security posture maintained with {summary['resolution_rate']}% resolution rate."
+            else:
+                text += f"Resolution rate of {summary['resolution_rate']}% indicates room for improvement."
+            return text
     
     def _generate_recommendations(self, threats, alerts, access_logs):
         """Generate security recommendations"""

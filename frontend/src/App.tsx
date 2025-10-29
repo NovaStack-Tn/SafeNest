@@ -28,7 +28,8 @@ import {
   RiskAssessments,
   ThreatIndicators,
   Watchlist,
-  ThreatHunting
+  ThreatHunting,
+  AlertAggregation
 } from './pages/ThreatIntelligence';
 import { Settings } from './pages/Settings';
 
@@ -120,6 +121,7 @@ function App() {
             <Route path="threat-indicators" element={<ThreatIndicators />} />
             <Route path="watchlist" element={<Watchlist />} />
             <Route path="threat-hunting" element={<ThreatHunting />} />
+            <Route path="alert-aggregation" element={<AlertAggregation />} />
             
             {/* Visitors & Assets */}
             <Route path="visitors" element={<Visitors />} />
