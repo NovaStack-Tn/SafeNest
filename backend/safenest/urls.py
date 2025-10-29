@@ -16,7 +16,36 @@ def health_check(request):
         'version': '1.0.0'
     })
 
+def api_root(request):
+    """API root endpoint with available routes"""
+    return JsonResponse({
+        'message': 'Welcome to SafeNest API',
+        'version': '1.0.0',
+        'endpoints': {
+            'admin': '/admin/',
+            'health': '/api/health/',
+            'authentication': {
+                'login': '/api/auth/token/',
+                'refresh': '/api/auth/token/refresh/',
+            },
+            'api': {
+                'core': '/api/',
+                'access_control': '/api/access-control/',
+                'security': '/api/security/',
+                'incidents': '/api/incidents/',
+                'faces': '/api/faces/',
+                'visitor_assets': '/api/visitor-assets/',
+                'threat_intelligence': '/api/threat-intelligence/',
+                'llm': '/api/llm/',
+                'dashboard': '/api/dashboard/',
+            }
+        }
+    })
+
 urlpatterns = [
+    # Root endpoint
+    path('', api_root, name='api_root'),
+    
     path('admin/', admin.site.urls),
     
     # Health check for deployment monitoring
@@ -33,6 +62,7 @@ urlpatterns = [
     path('api/incidents/', include('incidents.urls')),
     path('api/faces/', include('faces.urls')),
     path('api/visitor-assets/', include('visitor_assets.urls')),  # Visitor & Asset Management with AI
+    path('api/threat-intelligence/', include('threat_intelligence.urls')),  # Threat Intelligence Management
     path('api/llm/', include('llm.urls')),
     path('api/dashboard/', include('dashboard.urls')),
 ]
