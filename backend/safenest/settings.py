@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-import dj_database_url
+#import dj_database_url
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-in-production')
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'incidents.apps.IncidentsConfig',
     'faces.apps.FacesConfig',
     'visitor_assets.apps.VisitorAssetsConfig',  # 👥 Visitors & Assets
+    'threat_intelligence.apps.ThreatIntelligenceConfig',  # 🛡️ Threat Intelligence
     'llm.apps.LlmConfig',
     'dashboard.apps.DashboardConfig',
 ]
