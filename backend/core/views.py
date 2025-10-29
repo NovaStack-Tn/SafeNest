@@ -59,11 +59,47 @@ class UserViewSet(viewsets.ModelViewSet):
         
         return queryset
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get', 'patch'])
     def me(self, request):
-        """Get current user profile."""
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        """Get or update current user profile."""
+        if request.method == 'GET':
+            serializer = self.get_serializer(request.user)
+            return Response(serializer.data)
+        elif request.method == 'PATCH':
+            serializer = self.get_serializer(request.user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request):
+        """Change current user's password."""
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        
+        if not old_password or not new_password:
+            return Response(
+                {'error': 'Both old and new passwords are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not user.check_password(old_password):
+            return Response(
+                {'error': 'Old password is incorrect'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(new_password) < 8:
+            return Response(
+                {'error': 'New password must be at least 8 characters'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.set_password(new_password)
+        user.save()
+        
+        return Response({'message': 'Password changed successfully'})
     
     @action(detail=True, methods=['post'])
     def reset_password(self, request, pk=None):

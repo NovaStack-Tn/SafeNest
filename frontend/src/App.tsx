@@ -22,6 +22,7 @@ import { Visitors } from './pages/Visitors';
 import { Assets } from './pages/Assets';
 import { ThreatIntel } from './pages/ThreatIntel';
 import { Chat } from './pages/Chat';
+import { Settings } from './pages/Settings';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -112,7 +113,7 @@ function App() {
             
             {/* AI & Tools */}
             <Route path="chat" element={<Chat />} />
-            <Route path="settings" element={<ComingSoon title="Settings" />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
 
           {/* 404 Route */}
@@ -147,21 +148,5 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-// Temporary Coming Soon Component
-const ComingSoon = ({ title }: { title: string }) => {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          {title}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
-          This feature is coming soon...
-        </p>
-      </div>
-    </div>
-  );
-};
 
 export default App;
